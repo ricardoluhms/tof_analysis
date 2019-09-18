@@ -20,10 +20,6 @@ class Exp_data():
             data=self.df.loc[[exp_number],[exp_column_name]]
             value=data.values[0][0]
             return value
-
-
-
-
         
 if __name__ == "__main__":
     main()
