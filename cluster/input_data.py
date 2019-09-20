@@ -7,8 +7,9 @@ def main():
 class Input_data(Headers):
     def __init__(self,input_fld):
         #Texas Tof Model ['OPT8241']
-        self.simple_header("Initial parameters for Texas Tof Model ['OPT8241']")
-        self.simple_header("device_resolution = 240x320 pixels")
+        self.main_header("Loading Input data","IPDT_001")
+        #self.simple_header("Initial parameters for Texas Tof Model ['OPT8241']")
+        #self.simple_header("device_resolution = 240x320 pixels")
         self.input_folder=input_fld
         self.simple_header(("Reading files from ... "+input_fld))
         #self.mx_frames=max_frames_to_read
@@ -17,6 +18,7 @@ class Input_data(Headers):
         self.path_list=[]
         self.file_dict={}
         self._file_type_dict()
+        self.file_list(show_file=False)
 
     def _file_type_dict(self):
         file_type_List=['Ambient',
@@ -79,9 +81,10 @@ class Input_data(Headers):
                 if n_path not in self.path_list:
                     self.path_list.append(n_path)
         if show_file==True:
-            self.simple_header("files in the selected folder"+self.input_folder)
-            print("path_list")
-            print(self.path_list)
+            self.simple_header("files in the selected folder: ")
+            self.simple_header(self.input_folder)
+            #print("path_list")
+            #print(self.path_list)
 
     def _raw_single_file(self,file):
         _,b=os.path.split(file)
@@ -115,13 +118,14 @@ class Input_data(Headers):
             data,filetype,fmap=self._raw_single_file(file)
             reshaped_data=self._reshape_data(data,filetype,fmap)
             if count==0:
-                print("count start",count)
+                #print("count start",count)
                 dataGroup=reshaped_data
                 #print("data shape",dataGroup.shape)
             else:
                 dataGroup=np.hstack((dataGroup,reshaped_data))
             count+=1
             print("data shape",dataGroup.shape,"count",count,"- file_type=",filetype)
+
         return dataGroup
     
     def _rearrage_test(self,array):
@@ -143,7 +147,7 @@ class Input_data(Headers):
     # Step 1 - Get Array from Raw data - bin files
     def reshaped_into_table(self,mx_frames=0):
         self.mx_frames=mx_frames
-        self.main_header("Get Array","001")
+        self.main_header("Get Array","IPDT_001")
         array_group=self.reshaped_grouped()
 
         print("Initial shape", array_group.shape)
@@ -158,6 +162,18 @@ class Input_data(Headers):
         self.table_array=np.hstack((coord,array_table))
         print("Conversion from Array into Frames")
         print("Assigned pixel coordinates and frames for each bin file ", self.table_array.shape)
-    
+
+class Mfolder():
+    def __init__ (self,all_exp_folder):
+        self.all_exp_folder=all_exp_folder
+        self.folder_path_list=[]
+
+    def swipe_folders(self):
+        for folder in os.listdir(self.all_exp_folder):
+            n_f_path=os.path.join(self.all_exp_folder,folder)       
+            if os.path.isdir(n_f_path): 
+                if n_f_path not in self.folder_path_list:
+                    self.folder_path_list.append(n_f_path)
+
 if __name__ == '__main__':
     main()

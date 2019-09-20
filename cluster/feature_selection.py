@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 #### Machine Learning and Data Mining Libraries
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
+#from sklearn.decomposition import PCA
 
 #### Customized Libraries - Luhm
 from std_headers import Headers
