@@ -13,10 +13,11 @@ class Exp_data(Headers):
         self.file_path=file_path
         self.df=pd.read_excel(self.file_path, header=0,index_col=0)
         self.exp_numb=exp_numb
-        self.simple_header("Available columns")
+        #self.simple_header("Available columns")
         print(self.df.columns)
         if exp_numb==0:
-            self.simple_header("Experiment Number initially set as 0 but it must be changed for a value higher than 0")
+            pass
+            #self.simple_header("Experiment Number initially set as 0 but it must be changed for a value higher than 0")
 
     def get_exp_numb(self,exp_folder_path):
         self.exp_numb=int(exp_folder_path.split("Exp")[-1])

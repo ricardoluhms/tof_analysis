@@ -124,7 +124,7 @@ class Input_data(Headers):
             else:
                 dataGroup=np.hstack((dataGroup,reshaped_data))
             count+=1
-            print("data shape",dataGroup.shape,"count",count,"- file_type=",filetype)
+            #print("data shape",dataGroup.shape,"count",count,"- file_type=",filetype)
 
         return dataGroup
     
