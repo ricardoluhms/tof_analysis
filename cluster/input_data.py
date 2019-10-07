@@ -7,7 +7,7 @@ def main():
 class Input_data(Headers):
     def __init__(self,input_fld):
         #Texas Tof Model ['OPT8241']
-        self.main_header("Loading Input data","IPDT_001")
+        #self.main_header("Loading Input data","IPDT_001")
         #self.simple_header("Initial parameters for Texas Tof Model ['OPT8241']")
         #self.simple_header("device_resolution = 240x320 pixels")
         self.input_folder=input_fld

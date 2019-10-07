@@ -21,11 +21,11 @@ class Exp_data(Headers):
 
     def get_exp_numb(self,exp_folder_path):
         self.exp_numb=int(exp_folder_path.split("Exp")[-1])
-        
+
     def get_exp_data(self,exp_number,exp_column_name):
         if exp_number <=0:
             self.simple_header("There is no exp_number with negative values or zero")
-            print(self.df.head())
+            #print(self.df.head())
         else:
             data=self.df.loc[[exp_number],[exp_column_name]]
             value=data.values[0][0]

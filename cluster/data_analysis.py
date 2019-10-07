@@ -31,125 +31,208 @@ def main():
     ### File path to load data of all TOF exesetup datperiment a loading
     all_folder_path='D:/Codes/Videos_tof/Experimentos_atenuadores/'
     da=Data_analysis(all_folder_path,file_path)
-    crop_activate_list=[0,3,8,11,16,19]
-    #crop_activate_list=[0,5,10]
-    da.select_crop_folders(crop_activate_list)
-    ### Select Number of Crops
-    #output="d:/tof/output8.xlsx"
-    final_count_pack=da.run_data_analysis(folders_numb=24,frame_limit=30)
 
+    #################################################################
+    ### Enable Crop
+    #################################################################
+    #crop_activate_list=[0,3,8,11,16,19] Single Object Files
+    #crop_activate_list=[0,1,4,5,8,9] # Multiple Perpendicular Objects
+    #crop_activate_list=[0,1,4,5,8,9,12,15,18,21]
+    #da.select_crop_folders(crop_activate_list,crop_object_num=4)
+    output="d:/tof/tof_exp_multi_perp.xlsx"
+    #da.save_crop_coord(excel_filename=output)
 
-    depth_list=["1013","3009","4834"]
-    aten_list=["Sem filtro","Fume 1","Fume 2",
-               "Pelicula 1","Pelicula 2","Pelicula 3","Pelicula 4","Pelicula 5"]
+    #################################################################
+    ### Load Crop
+    #################################################################
+    da.load_crop_coord(excel_filename=output, source="excel")
+
+    #################################################################
+    ### Run analysis
+    #################################################################
+    da.run_data_analysis(folders_numb=12,frame_limit=30,
+                         crop_label_list=["fita_3M","mercosul","reflet","disco"])
+
+    #################################################################
+    ### Plot analysis
+    #################################################################
+    Data_analysis.filter_plot(da.final_count_pack,da.depth_list,da.aten_list)
+    #from IPython import embed;embed()
+
+    #################################################################
+    ### Load Crop
+    #################################################################
+    # depth_list=["1013","3009","4834"]
+    # aten_list=["Sem filtro","Pelicula 1","Pelicula 2",
+    #            "Pelicula 3","Pelicula 4","Pelicula 5"]
+    #aten_list=["Sem filtro","Fume 1","Fume 2",
+    #           "Pelicula 1","Pelicula 2","Pelicula 3","Pelicula 4","Pelicula 5"]
     
-    for depth in depth_list:
-        lst=[depth]
-        for aten in aten_list:
-            lst2=[aten]
-            aten_pack=Data_analysis.filter_by_atenuator(final_count_pack,aten_list=lst2)
-            depth_pack=Data_analysis.filter_by_depth(aten_pack,depth_list=lst)
-            Data_analysis.error_plot(depth_pack)
-
-    from IPython import embed;embed()
+    #from IPython import embed;embed()
+    # for depth in depth_list:
+    #     lst=[depth]
+    #     for aten in aten_list:
+    #         lst2=[aten]
+    #         aten_pack=Data_analysis.filter_by_atenuator(self.final_count_pack,aten_list=lst2)
+    #         depth_pack=Data_analysis.filter_by_depth(aten_pack,depth_list=lst)
+    #         Data_analysis.error_plot(depth_pack)
+   
     #columns=['atenuador','exp_depth','amp_mean','amp_std','error_mean','error_std'],
     #filename_export="d:/tof/output.xlsx"
+
 class Data_analysis():
-    def __init__(self,all_exp_folder,exp_setup_filepath):
-        #self.file_path=exp_setup_filepath
-        #self.main_folder=all_exp_folder
+    def __init__(self,all_exp_folder,exp_setup_filepath,frame_limit=30):
         self.mfld=Mfolder(all_exp_folder)
         self.mfld.swipe_folders()
         self.edt=Exp_data(exp_setup_filepath)
         self.resumed_exp_data=[]
         self.detailed_exp_data=[]
+        self.roi_crop_pack=[]
+        self.final_count_pack=[]
+        self.frame_limit=frame_limit
+        self.fs=Feature_show()
+        self.cp=Crop()
 
-    def select_crop_folders(self,crop_folder_list):
-        self.crop_activate_list=crop_folder_list
-
-    def single_folder(self,folder_count,frame_limit):
+    def single_folder(self,folder_count):
         folder_path=self.mfld.folder_path_list[folder_count]
         self.edt.get_exp_numb(folder_path)
         self.exp_depth=self.edt.get_exp_data(self.edt.exp_numb,"dist_mm")
         self.exp_aten=self.edt.get_exp_data(self.edt.exp_numb,"Atenuador")
+        self.exp_ang=self.edt.get_exp_data(self.edt.exp_numb,"angulo")
         self.idt=Input_data(folder_path)
-        self.grouped_array=self.idt.reshaped_grouped()[:frame_limit,:,:,]
+        self.grouped_array=self.idt.reshaped_grouped()[:self.frame_limit,:,:,]
 
-    def activate_crop(self,folder_count,
-                      frame_num=0,feature_num=0,
-                      crop_mode="single",crop_object_num=1,std_label=False):    
+    def select_crop_folders(self,crop_folder_list,crop_object_num=1):
+        self.crop_activate_list=crop_folder_list
+        for crop_fold_num in crop_folder_list:
+            self.single_folder(crop_fold_num)
+            for crop_obj in range(crop_object_num): 
+                self.activate_crop( frame_num=0,feature_num=0,
+                                    std_label=True,crop_obj=crop_obj)
+        self.save_crop_coord()
+
+    def activate_crop(self, frame_num=0,feature_num=0,
+                      std_label=False,crop_obj=0): 
         #frame_num=0 #Uses the first frame
         #feature_num=0 where 0 = Amplitude      
-        if folder_count in self.crop_activate_list:
-            img_o, self.bin_mask=self.fs.get_otsu(self.grouped_array,frame_num,feature_num)
-            if crop_mode=="single":
-                #####
-                #crop_label=self.cp.add_label(std_label=std_label)
-                self.roi_crop=self.cp.crop_img(img_o,self.exp_aten,std_label)
-                self.roi_crop_pack=self.roi_crop
-            if crop_mode=="multiple":
-                for crop_obj in range(crop_object_num):
-                    #crop_label=self.cp.add_label(label_num=crop_obj,std_label=std_label)
-                    self.roi_crop=self.cp.crop_img(img_o,self.exp_aten,std_label,crop_obj)
-                    self.roi_crop_pack.append(self.roi_crop)
+        if crop_obj==0:
+            self.img_o, self.bin_mask=self.fs.get_otsu(self.grouped_array,frame_num,feature_num)   
+        self.roi_crop=self.cp.crop_img(
+            self.img_o,std_label, self.exp_depth, 
+            self.exp_aten,self.exp_ang, crop_obj=crop_obj
+            )
+        self.roi_crop_pack.append(self.roi_crop)
+        
+    def save_crop_coord(self,excel_filename="D:/tof/outputs/roi_coord.xlsx"):
+        array=np.array(self.roi_crop_pack)
+        array_p1=array[:,:,0][:,0]
+        array_p2=array[:,:,1:][:,0]
+        df1=pd.DataFrame(array_p1,columns=["roi_coord"])
+        df2=pd.DataFrame(array_p2,columns=["label","aten","depth","ang"])
+        self.df_coord=pd.concat([df1,df2],axis=1)
+        self.df_coord.to_excel(excel_filename)
+
+    def load_crop_coord(self,
+                       excel_filename="D:/tof/outputs/roi_coord.xlsx",
+                       dataframe=pd.DataFrame(),
+                       source="dataframe"):
+        #source ="dataframe" / "excel"
+        if source =="dataframe":
+            if len(dataframe)==0:
+                self.df_coord=self.df_coord
+            else:
+                self.df_coord=dataframe
+        elif source =="excel":
+            self.df_coord=pd.read_excel(excel_filename, index_col=0)
+
+    def get_crop_coord(self,crop_fold_num,crop_label="std_label-0",aten_num=1):
+        if aten_num==0:
+            aten_lb="Sem Filtro"
+        elif aten_num==1:
+            aten_lb="Pelicula 1"
+        depth=self.df_coord['depth']==self.exp_depth
+        label=self.df_coord['label']==crop_label
+        aten=self.df_coord['aten']==aten_lb
+        and_check=self.df_coord[((depth & label)& aten)]
+        if len(and_check)==0:
+            print("Crop coordinates not found")
+        else:
+            roi_coord=str(and_check['roi_coord'])
+
+            roi_coord=roi_coord.split("[")[1].split("]")[0].split(",")
+            for num,coord in enumerate(roi_coord):
+                roi_coord[num]=int(coord)
+        return roi_coord
 
     def run_data_analysis(self,
-                          folders_numb=15, frame_limit=30,
-                          crop_mode="single" ):
+                          folders_numb=15,
+                          frame_limit=30,
+                          crop_label_list=["std_label-0"]):
         #### Available crop_mode = ["single","multiple"]
-        final_count_pack=[]
-        self.roi_crop_pack=[]
+        self.aten_list=[]
+        self.depth_list=[]
         for folder_count in range(folders_numb):
-            self.single_folder(folder_count,frame_limit)
-            self.fs=Feature_show()
-            self.cp=Crop()
-            self.activate_crop(
-                               folder_count,
-                               frame_num=0,feature_num=0,
-                               crop_mode=crop_mode,crop_object_num=1,
-                               std_label=True
-                               )
+            self.single_folder(folder_count)
+            _, self.bin_mask=self.fs.get_otsu(self.grouped_array,0,0)
 
-            if crop_mode=="single":
-                error_depth_array,eda_m,amp_data,apa_m=self.single_object_analysis(self.roi_crop_pack)
-                
-                self.resumed_exp_data.append(( self.exp_aten, self.exp_depth,
+            ##############
+            if self.exp_aten not in self.aten_list:
+                self.aten_list.append(self.exp_aten)
+
+            if self.exp_depth not in self.depth_list:
+                self.depth_list.append(self.exp_depth)
+            ##############
+
+            for crop_label in crop_label_list:
+                if self.exp_aten=="Sem Filtro":
+                    aten_num=0
+                else:
+                    aten_num=1
+                roi_coord=self.get_crop_coord(folder_count,crop_label=crop_label,aten_num=aten_num)
+                error_depth_array,eda_m,amp_data,apa_m,status=self.single_object_analysis(
+                    roi_coord)
+                if status:
+                    self.resumed_exp_data.append(( self.exp_aten, self.exp_depth,
+                                                self.exp_ang,
                                                 apa_m.mean(), apa_m.std(),
-                                                eda_m.mean(), eda_m.std() ))
+                                                eda_m.mean(), eda_m.std()))
+                else:
+                    print("Threshold Error- Aten= ", self.exp_aten,
+                          " - Depth= ", self.exp_depth,
+                          " - Ang= ", self.exp_ang,
+                          " - Label= ", crop_label)
 
-                final_count,name=self._apply_historgram(amp_data,error_depth_array)
-                final_count_pack.append((final_count,name,self.roi_crop_pack[0][1]))
+
+
+
+                final_count,name=self._apply_histogram(amp_data,error_depth_array)
+                
+                self.final_count_pack.append((final_count,name,crop_label))
                 #final count list format [amplitude,mask_count,mask_mean,mask_std]
 
-            if crop_mode=="multiple":
-                pass
-                #for obj_crop in range(crop_object_num):
-                    
+    def single_object_analysis(self,roi_coord):
 
-                #from IPython import embed;embed()
-        return final_count_pack
+        cropped_array=self.cp.multi_feature_crop(self.grouped_array,roi_coord)
+        cropped_mask=self.cp.single_feature_crop(self.bin_mask,roi_coord)
 
-            ###################################################
-            #from IPython import embed; embed()
-            
-        #columns=['atenuador','exp_depth','amp_mean','amp_std','error_mean','error_std']
-        #self.df=pd.DataFrame(self.resumed_exp_data,columns=columns)
-        #self.df.to_excel(filename_export)
-
-    def single_object_analysis(self,roi_crop_pack):
-        # self.cp=Crop()
-        # self.fs=Feature_show())
-        cropped_array=self.cp.multi_feature_crop(self.grouped_array,roi_crop_pack)
-        cropped_mask=self.cp.single_feature_crop(self.bin_mask,roi_crop_pack)
-        cropped_masked_array=self.fs.apply_mask(cropped_array,cropped_mask)
+        if cropped_mask.sum()==0:
+            cropped_masked_array=cropped_array
+        else:   
+            cropped_masked_array=self.fs.apply_mask(cropped_array,cropped_mask)
         error_depth_array, error_mask=self.fs.apply_depth_check(cropped_masked_array,self.exp_depth)
         #### Check Effects of error mask over depth array and amp_data
-        eda_m=error_depth_array[error_mask]
         amp_data=cropped_masked_array[:,0,:,:]
-        apa_m=amp_data[error_mask]
-        return error_depth_array,eda_m,amp_data,apa_m
+        if error_mask.sum()==0:
+            apa_m=np.array([0])
+            eda_m=np.array([0])
+            status=False
+        else:
+            apa_m=amp_data[error_mask]
+            eda_m=error_depth_array[error_mask]
+            status=True
+        return error_depth_array,eda_m,amp_data,apa_m,status
 
-    def _apply_historgram(self,amp_data,error_depth_array,plot=False):
+    def _apply_histogram(self,amp_data,error_depth_array,plot=False):
         self.amp_h=Main_Histogram(amp_data)
         self.amp_h.histo()
         self.err_d=Depth_Error_hist(self.amp_h.hist_bins)
@@ -161,7 +244,10 @@ class Data_analysis():
             e_name="Exp_0"
         else:
             e_name="Exp_"
-        name=e_name+str(self.edt.exp_numb)+" - Aten: "+self.exp_aten+" - Dist: "+str(self.exp_depth)
+        name=(e_name+str(self.edt.exp_numb)+
+              " - Aten: " + self.exp_aten+
+              " - Depth: " + str(self.exp_depth)+
+              " - Ang: "  + self.exp_ang)
         if plot==True:
             self.err_d.plot(name,final_count)
         return final_count,name
@@ -172,8 +258,19 @@ class Data_analysis():
         print("Available Column Names",self.dfr.label_names)
     
     @staticmethod
+    def filter_plot(final_count_pack,depth_list,aten_list):
+        for depth in depth_list:
+            lst=[str(depth)]
+            for aten in aten_list:
+                lst2=[aten]
+                aten_pack=Data_analysis.filter_by_atenuator(final_count_pack,aten_list=lst2)
+                depth_pack=Data_analysis.filter_by_depth(aten_pack,depth_list=lst)
+                #from IPython import embed; embed()
+                Data_analysis.error_plot(depth_pack)
+
+    @staticmethod
     def error_plot(count_pack):
-        jitter=0.5
+        jitter=2
         _, ax = plt.subplots(figsize=(10, 10))
         ax.set_title("Amplitude vs Depth_Error Mean+-Std")         
         ls = 'dotted'
@@ -183,7 +280,7 @@ class Data_analysis():
             if len(data)!=0:
                 exp_name=experiment[1]
                 label=experiment[2]
-                label_name=exp_name+"_"+label
+                label_name=exp_name+"- Label: "+label
                 x_axis_values=data[:,0]+exp_num*jitter
                 y_mean=data[:,2]
                 y_std=data[:,3]
@@ -194,15 +291,18 @@ class Data_analysis():
                                     linestyle=ls,
                                     marker="o",
                                     label=label_name)
-                # name1=exp_name.split(" - ")[0]
-                # name2=exp_name.split("Aten: ")[1].split(" - ")[0]
-                # if len(name2.split(" "))>1:
-                #     name2=name2.split(" ")[0]+"_"+name2.split(" ")[1]
-                # name3=exp_name.split("Dist: ")[1]
-                # name=name1+"_"+name2+"_"+name3       
-                # ax.legend(loc='lower right')
-                # file_name="C:/Users/ricar/Desktop/Output/"+name+".jpg"
-                # plt.savefig(file_name)
+  
+                ax.legend(loc='lower right')
+                f_name=exp_name.replace(" - ","_")
+                f_name=f_name.replace(": ","_")
+
+
+
+                #from IPython import embed; embed()
+                file_name="C:/Users/ricar/Desktop/Output/"+f_name+"_crop4.jpg"
+                plt.savefig(file_name)
+        #ax.set_xlim((0, 1000))
+        #ax.set_ylim((-0.200, 0.200))
         plt.show()
         
     def plot_setup(self,x_axis_col_name='exp_depth',
@@ -232,7 +332,8 @@ class Data_analysis():
             data=np.array(experiment[0])
             if len(data)!=0:
                 exp_name=experiment[1]
-                depth=exp_name.split("Dist: ")[1]
+                depth=exp_name.split("Depth: ")[1]
+                depth=depth.split(" - ")[0]
                 if depth in depth_list:
                     filtered_pack.append(experiment)
         return filtered_pack
@@ -290,21 +391,16 @@ class Feature_show():
 
         error_depth_array=any_grouped_array[:,2,:,:]-exp_depth/1000
         eda=error_depth_array
-        #print(eda.shape[0]*eda.shape[1]*eda.shape[2])
-        #print(exp_depth/1000)
         eda=error_depth_array.copy()
-        eda_mask=abs(eda[:,:,:])<0.08
-        #print(eda_mask.sum())
+        eda_mask=abs(eda[:,:,:])<0.2
         if plot_show==True:
-            for i in range(eda.shape[0]):
-                ###### Code under development - 
+            for i in range(eda.shape[0]): 
                 img=eda[i]
                 img=filter.norm(img)
                 img = cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
                 self.std_window_show("Depth check",img)
                 cv2.waitKey()
                 cv2.destroyWindow("Depth check")
-            
         return error_depth_array, eda_mask
 
     def apply_mask(self,any_grouped_array,mask,mask_type="binary"):
@@ -332,23 +428,26 @@ class Crop(Feature_show):
             refPt.append((x, y))
             cropping = False
         if len(refPt)==2:
-            cv2.rectangle(img, refPt[0], refPt[1], (0,255,255), 2)
+            cv2.rectangle(img, refPt[0], refPt[1], (0,255,255), 1)
             roi, _=self._crop_coord_detect(refPt,img)
             self.std_window_show('Crop',roi)
     
-    def crop_img(self,img_o,exp_aten,std_label,crop_obj=1):
+    def crop_img(self,img_o,std_label,exp_depth,exp_aten,exp_ang,crop_obj=1):
         global img, refPt, cropping
         refPt=[]
         roi_crop=[]
         cropping = False
         img = img_o.copy()
         img_clone = img.copy()
-        cv2.namedWindow('Image',cv2.WINDOW_GUI_NORMAL)
-        cv2.setMouseCallback('Image', self.click_and_crop)
-        print('Select the desired area to crop')
+        window_name=("Crop object number= "+str(crop_obj)+
+                     " - Depth= "+str(exp_depth)+
+                     " - Angle= "+str(exp_aten)) 
+
+        cv2.namedWindow(window_name,cv2.WINDOW_GUI_NORMAL)
+        cv2.setMouseCallback(window_name, self.click_and_crop)
         while True:
             skip_crop=False
-            cv2.imshow('Image', img)
+            cv2.imshow(window_name, img)
             key = cv2.waitKey(1) & 0xFF   
             # if the 'r' key is pressed, reset the cropping region
             if key == ord("r"):
@@ -368,7 +467,7 @@ class Crop(Feature_show):
         
         cv2.destroyAllWindows()
         crop_label=self.add_label(label_num=crop_obj,std_label=std_label)
-        roi_crop.append((roi_coord,crop_label,exp_aten))
+        roi_crop.append((roi_coord,crop_label,exp_aten,exp_depth,exp_ang))
         return roi_crop
 
     def _crop_coord_detect(self,refPt,img):
@@ -387,26 +486,12 @@ class Crop(Feature_show):
             label="std_label-"+str(label_num)
         return label
 
-    def multi_feature_crop(self,grouped_array,roi_crop):
-        if len(roi_crop)==1:
-            roi_coord=roi_crop[0][0]
-            # [x_min,y_min,x_max,y_max]
-            group_crop=grouped_array[:,:,roi_coord[1]:roi_coord[3],roi_coord[0]:roi_coord[2]]
-        elif len(roi_crop)<1:
-            print("Error - Crop cannot be performed without ROI coordinates")
-            print("roi_crop input value = ",roi_crop)
-            group_crop="error"
+    def multi_feature_crop(self,grouped_array,roi_coord):
+        group_crop=grouped_array[:,:,roi_coord[1]:roi_coord[3],roi_coord[0]:roi_coord[2]]
         return group_crop
 
-    def single_feature_crop(self,simple_array,roi_crop):
-        if len(roi_crop)==1:
-            roi_coord=roi_crop[0][0]
-            # [x_min,y_min,x_max,y_max]
-            simple_crop=simple_array[roi_coord[1]:roi_coord[3],roi_coord[0]:roi_coord[2]]
-        elif len(roi_crop)<1:
-            print("Error - Crop cannot be performed without ROI coordinates")
-            print("roi_crop input value = ",roi_crop)
-            simple_crop="error"
+    def single_feature_crop(self,simple_array,roi_coord):
+        simple_crop=simple_array[roi_coord[1]:roi_coord[3],roi_coord[0]:roi_coord[2]]
         return simple_crop
 
 class Dataframe_results():
@@ -477,7 +562,7 @@ class Main_Histogram():
     def __init__(self,data):
         self.hist_min=data.min()
         self.hist_max=data.max()
-        self.hist_bins=np.arange(self.hist_min,self.hist_max,10)
+        self.hist_bins=np.arange(self.hist_min,self.hist_max,15)
         self.data=data
 
     def histo(self):
