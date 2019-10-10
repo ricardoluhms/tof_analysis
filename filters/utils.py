@@ -17,9 +17,10 @@ class filter():
 		return frame.astype(dtype)
 
 	def apply(self, frame):
+		h, w = frame.shape[:2]
 		frame = frame.reshape((self.height, self.width))
 		frame = self.filter(frame)
-		frame = frame.ravel()#reshape((-1,1))
+		frame = frame.reshape((-1,1))
 		return frame
 
 	def filter(self, frame):
@@ -41,7 +42,7 @@ class filter_int(filter):
 		frame_max = frame.max()
 		frame = self.filter(frame)
 		frame = frame_max*frame.astype('float32')/255+frame_min
-		frame = frame.ravel()#reshape((-1,1))
+		frame = frame.reshape((-1,1))
 		return frame
 
 

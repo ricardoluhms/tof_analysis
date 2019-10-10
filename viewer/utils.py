@@ -16,6 +16,8 @@ class pcv():#point cloud viewer
 	@staticmethod
 	def imshow(window_name, point_cloud, height=240, width=320):
 		frames = []
+		if len(point_cloud.shape) == 1:
+			point_cloud = point_cloud.reshape((-1,1))
 		for channel in range(point_cloud.shape[1]):
 			frame = point_cloud[:,channel].reshape((height, width))
 			frame = pcv.norm(frame)
