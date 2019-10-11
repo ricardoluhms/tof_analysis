@@ -13,6 +13,7 @@ if __name__=='__main__':
 	amp_opener = Amplitude_opener(path+'Amplitude.bin',240,320);amp_opener.open()
 	phs_opener = Phase_opener(path+'Phase.bin',240,320);phs_opener.open()
 	phase_processor = phase2depth(240,320)
+	point_cloud_processor = phase2point_cloud(240,320)
 	cv2.namedWindow('delta', cv2.WINDOW_NORMAL)
 	edfr = edge_filter(240,320)
 	while 1:
@@ -25,6 +26,7 @@ if __name__=='__main__':
 		amp_data[amp_data>amp_data.mean()+3*amp_data.std()]=amp_data.mean()+3*amp_data.std()
 		depth_real = pc_data[:,2]
 		depth_calc = phase_processor.process(phs_data)
+		pc_calc = point_cloud_processor.process(phs_data)
 		delta = np.abs(depth_real.ravel() - depth_calc.ravel())#.mean()
 		print('depth_real:', depth_real.min(), depth_real.max(), depth_real.mean(), depth_real.std())
 		print('depth_calc:', depth_calc.min(), depth_calc.max(), depth_calc.mean(), depth_calc.std())
@@ -34,11 +36,13 @@ if __name__=='__main__':
 		pcv.imshow('depth_calc', depth_calc)
 		cv2.imshow('delta', heat_map(delta.reshape((240,320))))
 		pcv.imshow('', pc_data)
+		pcv.imshow('calc', pc_calc)
 		key_pressed = cv2.waitKey(33) & 0xff
 		if key_pressed in [32, ord('p')]:
 			key_pressed = cv2.waitKey(0) & 0xff
 		if key_pressed in [ord('s')]:
-			pcv.pcshow(pc_data)
+			pcv.pcshow(pc_calc)
+			# pcv.pcshow(pc_data)
 			key_pressed = cv2.waitKey(0) & 0xff
 		if key_pressed in [27, ord('q')]:
 			break
