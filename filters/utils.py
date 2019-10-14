@@ -93,5 +93,7 @@ class edge_filter(filter):
 		# edge = cv2.erode(edge, cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(self.kernel_size-2,self.kernel_size-2)))
 		# cv2.imshow('edge', edge)
 		edge = edge/edge.max()
+		#cv2.imshow('ed', edge)
 		frame = frame*np.abs(edge-1)
+		#frame = frame*edge
 		return frame
