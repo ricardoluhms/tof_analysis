@@ -2,6 +2,10 @@ import numpy as np
 
 
 class bin_opener():
+	"""
+	Abstract class for all opners. After creating an object ANY_opener() call method open() and them use read()
+	To create a new opener just change dtype and, IF NEEDED, overwrite reshape or read_transformation.
+	"""
 	def __init__(self, file, height, width, dtype):
 		self.file = file
 		self.height = height
@@ -27,7 +31,7 @@ class bin_opener():
 		return True, data
 
 	def read_transformation(self,data):
-		data = data.reshape((self.width,self.height)).transpose().ravel()
+		data = data.reshape((self.width,self.height)).transpose().reshape((-1,1))
 		return data
 
 
@@ -58,11 +62,11 @@ class Phase_opener(bin_opener):
 	def __init__(self,file,height,width):
 		bin_opener.__init__(self,file,height,width,'uint16')
 
-# 'Ambient',
-# '0Amplitude','AmplitudeAvg','AmplitudeStd',
-# 'Depth','DepthAvg','DepthStd','Distance',
-# 'Phase','PhaseAvg','PhaseStd',
-# 'PointCloud'
+#'Ambient',
+#'0Amplitude','AmplitudeAvg','AmplitudeStd',
+#'Depth','DepthAvg','DepthStd','Distance',
+#'Phase','PhaseAvg','PhaseStd',
+#'PointCloud'
 # np.uint8,
 # np.uint16,np.uint16,np.uint16,
 # np.float32,np.float32,np.float32,np.float32,

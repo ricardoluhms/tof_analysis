@@ -1,6 +1,10 @@
 import cv2, numpy as np
 
 class filter():
+	"""
+	Abstract class for all filters. After creating an object ANY_filter() call method apply()
+	To create a new filter just overwrite the filter method as the reshape is done before and after.
+	"""
 	def __init__(self, height, width):
 		self.height = height
 		self.width = width
@@ -13,6 +17,7 @@ class filter():
 		return frame.astype(dtype)
 
 	def apply(self, frame):
+		h, w = frame.shape[:2]
 		frame = frame.reshape((self.height, self.width))
 		frame = self.filter(frame)
 		frame = frame.reshape((-1,1))
@@ -23,6 +28,10 @@ class filter():
 
 
 class filter_int(filter):
+	"""
+	Abstract class for filters, but with normalized input for method filter().
+	After creating an object ANY_filter() call method apply()
+	"""
 	def __init__(self, height, width):
 		filter.__init__(self, height, width)
 
@@ -38,6 +47,9 @@ class filter_int(filter):
 
 
 class median_filter(filter_int):
+	"""
+	Filter class using the median inside a window with size=kernel_size
+	"""
 	def __init__(self, height, width, kernel_size=3):
 		filter_int.__init__(self, height, width)
 		self.kernel_size = kernel_size
@@ -48,12 +60,15 @@ class median_filter(filter_int):
 
 
 class mean_filter(filter_int):
+	"""
+	Filter class using the mean inside a window with size=kernel_size
+	"""
 	def __init__(self, height, width, kernel_size=3):
 		filter_int.__init__(self, height, width)
 		self.kernel_size = kernel_size
 
 	def filter(self, frame):
-		frame = cv2.blur(filter.norm(frame, dtype='uint8'), self.kernel_size)
+		frame = cv2.blur(filter.norm(frame), (self.kernel_size,self.kernel_size))
 		return frame
 
 
@@ -80,6 +95,10 @@ class bilateral_filter(filter):
 
 
 class edge_filter(filter):
+	"""
+	Filter class that attibute the value 0 to countour/edges.
+	Used to delete flying pixels.
+	"""
 	def __init__(self, height, width, kernel_size=3):
 		filter.__init__(self, height, width)
 		self.lap_kernel = np.array([[0,-1,0],[-1,4,-1],[0,-1,0]])
