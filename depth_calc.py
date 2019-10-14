@@ -24,19 +24,13 @@ if __name__=='__main__':
 			break
 
 		amp_data[amp_data>amp_data.mean()+3*amp_data.std()]=amp_data.mean()+3*amp_data.std()
-		depth_real = pc_data[:,2]
-		depth_calc = phase_processor.process(phs_data)
 		pc_calc = point_cloud_processor.process(phs_data)
-		delta = np.abs(depth_real.ravel() - depth_calc.ravel())#.mean()
-		print('depth_real:', depth_real.min(), depth_real.max(), depth_real.mean(), depth_real.std())
-		print('depth_calc:', depth_calc.min(), depth_calc.max(), depth_calc.mean(), depth_calc.std())
-		print('delta:', delta.min(), delta.max(), delta.mean(), delta.std())
+		pc_calc[:,0:1] = edfr.apply(pc_calc[:,0:1])
+		pc_calc[:,1:2] = edfr.apply(pc_calc[:,1:2])
+		pc_calc[:,2:3] = edfr.apply(pc_calc[:,2:3])
+		delta = np.abs(pc_data[:,:3] - pc_calc)
 
-		pcv.imshow('depth_real', depth_real)
-		pcv.imshow('depth_calc', depth_calc)
-		cv2.imshow('delta', heat_map(delta.reshape((240,320))))
-		pcv.imshow('', pc_data)
-		pcv.imshow('calc', pc_calc)
+		pcv.imshow('delta', pc_calc)
 		key_pressed = cv2.waitKey(33) & 0xff
 		if key_pressed in [32, ord('p')]:
 			key_pressed = cv2.waitKey(0) & 0xff
