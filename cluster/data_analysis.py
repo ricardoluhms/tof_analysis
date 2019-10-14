@@ -14,8 +14,8 @@ from input_data import Input_data, Mfolder
 from feature_selection import Feature_selection
 from exp_data import Exp_data
 #### Customized Libraries  - Vinicius
-from custom_modules.filters.utils import filter
-
+from filters.utils import filter
+from filters.utils import edge_filter as edf
 #####
 """
 Objectives:
@@ -31,7 +31,7 @@ def main():
     ### File path to load data of all TOF exesetup datperiment a loading
     all_folder_path='D:/Codes/Videos_tof/Experimentos_atenuadores/'
     da=Data_analysis(all_folder_path,file_path)
-
+    
     #################################################################
     ### Enable Crop
     #################################################################
@@ -46,7 +46,6 @@ def main():
     ### Load Crop
     #################################################################
     da.load_crop_coord(excel_filename=output, source="excel")
-
     #################################################################
     ### Run analysis
     #################################################################
@@ -56,7 +55,7 @@ def main():
     #################################################################
     ### Plot analysis
     #################################################################
-    Data_analysis.filter_plot(da.final_count_pack,da.depth_list,da.aten_list)
+    #Data_analysis.filter_plot(da.final_count_pack,da.depth_list,da.aten_list)
     #from IPython import embed;embed()
 
     #################################################################
@@ -68,7 +67,6 @@ def main():
     #aten_list=["Sem filtro","Fume 1","Fume 2",
     #           "Pelicula 1","Pelicula 2","Pelicula 3","Pelicula 4","Pelicula 5"]
     
-    #from IPython import embed;embed()
     # for depth in depth_list:
     #     lst=[depth]
     #     for aten in aten_list:
@@ -145,7 +143,7 @@ class Data_analysis():
         elif source =="excel":
             self.df_coord=pd.read_excel(excel_filename, index_col=0)
 
-    def get_crop_coord(self,crop_fold_num,crop_label="std_label-0",aten_num=1):
+    def get_crop_coord(self,crop_label="std_label-0",aten_num=1):
         if aten_num==0:
             aten_lb="Sem Filtro"
         elif aten_num==1:
@@ -174,7 +172,7 @@ class Data_analysis():
         for folder_count in range(folders_numb):
             self.single_folder(folder_count)
             _, self.bin_mask=self.fs.get_otsu(self.grouped_array,0,0)
-
+            self.fs.filters_eval(self.grouped_array,self.exp_depth,self.exp_aten)
             ##############
             if self.exp_aten not in self.aten_list:
                 self.aten_list.append(self.exp_aten)
@@ -188,9 +186,10 @@ class Data_analysis():
                     aten_num=0
                 else:
                     aten_num=1
-                roi_coord=self.get_crop_coord(folder_count,crop_label=crop_label,aten_num=aten_num)
+                roi_coord=self.get_crop_coord(crop_label=crop_label,aten_num=aten_num)
                 error_depth_array,eda_m,amp_data,apa_m,status=self.single_object_analysis(
-                    roi_coord)
+                    roi_coord,crop_label)
+                #  from IPython import embed; embed()
                 if status:
                     self.resumed_exp_data.append(( self.exp_aten, self.exp_depth,
                                                 self.exp_ang,
@@ -210,7 +209,7 @@ class Data_analysis():
                 self.final_count_pack.append((final_count,name,crop_label))
                 #final count list format [amplitude,mask_count,mask_mean,mask_std]
 
-    def single_object_analysis(self,roi_coord):
+    def single_object_analysis(self,roi_coord,crop_label):
 
         cropped_array=self.cp.multi_feature_crop(self.grouped_array,roi_coord)
         cropped_mask=self.cp.single_feature_crop(self.bin_mask,roi_coord)
@@ -219,7 +218,12 @@ class Data_analysis():
             cropped_masked_array=cropped_array
         else:   
             cropped_masked_array=self.fs.apply_mask(cropped_array,cropped_mask)
-        error_depth_array, error_mask=self.fs.apply_depth_check(cropped_masked_array,self.exp_depth)
+        error_depth_array, error_mask=self.fs.apply_depth_check(
+                        cropped_masked_array,
+                        self.exp_depth,
+                        self.exp_aten,
+                        crop_label,
+                        plot_show=False)
         #### Check Effects of error mask over depth array and amp_data
         amp_data=cropped_masked_array[:,0,:,:]
         if error_mask.sum()==0:
@@ -358,6 +362,13 @@ class Feature_show():
     def std_window_show(window_name,array):
         cv2.namedWindow(window_name,cv2.WINDOW_GUI_EXPANDED)
         cv2.imshow(window_name,array)
+    
+    @staticmethod
+    def single_window(window_name,array):
+        cv2.namedWindow(window_name,cv2.WINDOW_GUI_EXPANDED)
+        cv2.imshow(window_name,array)
+        cv2.waitKey()
+        cv2.destroyWindow(window_name)
 
     @staticmethod
     def _check_exploding(img):
@@ -367,6 +378,17 @@ class Feature_show():
         if sum_mask>1:
             img[mask]=exp_threshold#+img.std()
         return img
+    @staticmethod
+    
+    def conv_weight(img,kmin=0.1,kmax=1):
+        kser1=np.array([kmax,kmax,kmax])
+        kser2=np.array([kmax,kmin,kmax])
+        kernel=np.vstack((kser1,kser2))
+        kernel=np.vstack((kernel,kser1))
+        img=cv2.filter2D(img,-1,kernel)/kernel.sum()
+        img=img/img.max()
+        return img
+        #from IPython import embed;embed()
 
     def feature_show(self,grouped_array):
         for i in range(grouped_array.shape[0]):
@@ -384,23 +406,134 @@ class Feature_show():
         mask = cv2.threshold(img,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
         mask=(mask==255)
         img=img*mask
-        img = cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
+        #img = cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
         return img, mask
 
-    def apply_depth_check(self,any_grouped_array,exp_depth,plot_show=False):
+    def get_edge(self,grouped_array,frame_num,feature_num):
+        frame_img=grouped_array[frame_num][feature_num]
+        shap=frame_img.shape
+        edge=edf(shap[0],shap[1])
+        ##########################################################
+        img=edge.apply(frame_img)
+        #from IPython import embed; embed()
+        return img#
+
+    def filters_eval(self,any_grouped_array,exp_depth,exp_aten):
+        name0=("Depth: "+str(exp_depth)+"-At: "+exp_aten)
+        aga=any_grouped_array
+        a_shape=aga.shape
+        names=["Amp.","Amp.Edge","Amp.Otsu.Mask","Amp.Otsu.Out","Depth","D.Error","Depth.Edge"]
+        f_names=[]
+        #### Amp Filters
+        amp=aga[:,0,:,:]
+        otsu_amp_mask=np.zeros(amp.shape)
+        otsu_amp_out=np.zeros(amp.shape)
+        edge_amp=np.zeros(amp.shape)
+        #### Depth Filters
+        depth=aga[:,2,:,:]
+        depth_error=depth-exp_depth/1000
+        edge=edf(a_shape[2],a_shape[3])
+        edge_depth=np.zeros(depth.shape)
+        for name in names:
+            m_name=name+" - "+name0
+            f_names.append(m_name)
+
+        for fram in range(a_shape[0]):
+            ###Otsu Amp
+            ot_img, ot_mask=self.get_otsu(any_grouped_array,fram,0)
+            ot_mask=ot_mask.astype("int")*254
+            ot_mask=ot_mask/ot_mask.max()
+            otsu_amp_mask[fram,:,:]=ot_mask
+            otsu_amp_out[fram,:,:]=ot_img
+            ###Edge
+            edge_depth[fram,:,:]=edge.apply(depth[fram,:,:]).reshape(a_shape[2],a_shape[3])
+            edge_amp[fram,:,:]=edge.apply(amp[fram,:,:]).reshape(a_shape[2],a_shape[3])
+            ###Error
+            d_err_img=depth_error[fram,:,:]
+            ### Amp Norm data
+            raw_amp_img=amp[fram,:,:]
+            
+            amp_img_w=self.conv_weight(raw_amp_img)
+            amp_img=self._check_exploding(raw_amp_img)
+            amp_img2=self._check_exploding(amp_img_w)
+
+            raw_amp_img=raw_amp_img/raw_amp_img.max()
+            amp_img=amp_img/amp_img.max()
+            amp_img2=amp_img2/amp_img2.max()
+
+            raw_edge=edge.apply(raw_amp_img).reshape(a_shape[2],a_shape[3])
+            check_edge=edge.apply(amp_img).reshape(a_shape[2],a_shape[3])
+            conv_check_edge=edge.apply(amp_img2).reshape(a_shape[2],a_shape[3])
+
+            self.std_window_show("Raw Amp Img",raw_amp_img)
+            self.std_window_show("Check Amp Img",amp_img)
+            self.std_window_show("Conv Check Amp Img",amp_img2)
+            self.std_window_show("Raw Edge Amp Img",raw_edge)
+            self.std_window_show("Check Edge Amp Img",check_edge)
+            self.std_window_show("Conv Check Edge Amp Img",conv_check_edge)
+
+
+            #self.std_window_show(f_names[2],ot_mask)
+            #self.std_window_show(f_names[3],ot_img)
+            #self.std_window_show(f_names[4],self._check_exploding(depth[fram,:,:]))
+            #self.std_window_show(f_names[5],d_err_img)
+            #self.std_window_show(f_names[6],edge_depth[fram,:,:])
+
+            key_pressed = cv2.waitKey(300) & 0xff
+            if key_pressed in [32, ord('p')]:
+                key_pressed = cv2.waitKey(0) & 0xff
+        cv2.destroyAllWindows()
+
+    def apply_depth_check(self,any_grouped_array,exp_depth,exp_aten,exp_label,plot_show=False):
 
         error_depth_array=any_grouped_array[:,2,:,:]-exp_depth/1000
+        depth=any_grouped_array[:,2,:,:]
         eda=error_depth_array
+        amp_array=any_grouped_array[:,0,:,:]
+
         eda=error_depth_array.copy()
         eda_mask=abs(eda[:,:,:])<0.2
+        name=("GTD: "+str(exp_depth)+" -Lb: "+exp_label+"-At: "+exp_aten)
         if plot_show==True:
-            for i in range(eda.shape[0]): 
-                img=eda[i]
-                img=filter.norm(img)
-                img = cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
-                self.std_window_show("Depth check",img)
-                cv2.waitKey()
-                cv2.destroyWindow("Depth check")
+            shap=eda[0,:,:].shape
+            edge=edf(shap[0],shap[1])
+            for i in range(eda.shape[0]):
+                #if exp_aten!="Sem filtro":
+                if (exp_aten=="Pelicula 10"):
+                    img0, ot_mask=self.get_otsu(any_grouped_array,i,0)
+                    
+                    ot_mask=ot_mask.astype("int")*254
+                    ot_mask=cv2.cvtColor(ot_mask,cv2.COLOR_GRAY2RGB)
+                    #from IPython import embed; embed()
+                    img=eda[i]
+                    img=filter.norm(img)
+                    img2=depth[i]
+                    img2=filter.norm(img2)
+                    img3=amp_array[i]
+                    img4=edge.apply(img3)
+                    img3=filter.norm(img3)
+                    img4=img4.reshape(shap[0],shap[1])
+                    #img = cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
+                    #name00=("MaskOtsu "+name)
+                    name0=("AmpOtsu "+name)
+                    name1=("D.Error "+name)
+                    name2=("Depth "+name)
+                    name3=("Amp. "+name)
+                    name4=("Amp.Edge"+name)
+                    self.std_window_show(name0,ot_mask)
+                    self.std_window_show(name1,img)
+                    self.std_window_show(name2,img2)
+                    self.std_window_show(name3,img3)
+                    self.std_window_show(name4,img4)
+                    key_pressed = cv2.waitKey(300) & 0xff
+                    if key_pressed in [32, ord('p')]:
+                        key_pressed = cv2.waitKey(0) & 0xff
+            if (exp_aten=="Pelicula 10"):
+                cv2.destroyWindow(name0)
+                cv2.destroyWindow(name1)
+                cv2.destroyWindow(name2)
+                cv2.destroyWindow(name3)
+                cv2.destroyWindow(name4)
         return error_depth_array, eda_mask
 
     def apply_mask(self,any_grouped_array,mask,mask_type="binary"):
