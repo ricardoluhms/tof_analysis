@@ -1,3 +1,6 @@
+import sys
+sys.path.append("D:\\tof")
+
 #### Image and Array Operations Libraries
 import numpy as np
 import cv2
@@ -9,9 +12,9 @@ from matplotlib import cm
 from matplotlib import patches as ptc
 
 #### Customized Libraries - Luhm
-from std_headers import Headers
-from input_data import Input_data
-from feature_selection import Feature_selection
+from cluster.std_headers import Headers
+from cluster.input_data import Input_data
+from cluster.feature_selection import Feature_selection
 #### Customized Libraries - Vinicius
 
 def main():
