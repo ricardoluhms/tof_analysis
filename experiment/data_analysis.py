@@ -1,5 +1,6 @@
 import sys
-### Modify sys path if the tof project folder is not in PATH 
+### Modify sys path if the tof project folder is not in PATH
+#print(sys.path)
 sys.path.append("D:\\tof")
 
 import numpy as np
@@ -14,6 +15,7 @@ import matplotlib.pyplot as plt
 from bin_opener.input_data import Input_data, Mfolder
 from experiment.exp_data import Exp_data
 from experiment.histogram import Main_Histogram, Depth_Error_hist
+from viewer.show_n_crop import Feature_show, Crop
 
 #####
 """
@@ -35,7 +37,7 @@ def main():
     ### Enable Crop
     #################################################################
     #crop_activate_list=[0,3,8,11,16,19] Single Object Files
-    #crop_activate_list=[0,1,4,5,8,9] # Multiple Perpendicular Objects
+    #crop_activate_list=[1,5,9] # Multiple Perpendicular Objects
     #crop_activate_list=[0,1,4,5,8,9,12,15,18,21]
     #da.select_crop_folders(crop_activate_list,crop_object_num=4)
     output="d:/tof/tof_exp_multi_perp.xlsx"
@@ -99,26 +101,50 @@ class Data_analysis():
         self.idt=Input_data(folder_path)
         self.grouped_array=self.idt.reshaped_grouped()[:self.frame_limit,:,:,]
 
-    def select_crop_folders(self,crop_folder_list,crop_object_num=1):
-        self.crop_activate_list=crop_folder_list
-        for crop_fold_num in crop_folder_list:
-            self.single_folder(crop_fold_num)
-            for crop_obj in range(crop_object_num): 
-                self.activate_crop( frame_num=0,feature_num=0,
-                                    std_label=True,crop_obj=crop_obj)
-        self.save_crop_coord()
+    def select_crop_folders(self,crop_folder_list,crop_mode="manual",crop_object_num=1):
+        if (crop_mode=="auto" or crop_mode=="manual")==False:
+            print("Available Crop modes are: auto or manual - Switching to auto mode")
+            crop_mode="auto"
+        else:
+            self.crop_activate_list=crop_folder_list
+            for crop_fold_num in crop_folder_list:
+                self.single_folder(crop_fold_num)
+                img, mask = Feature_show().dual_otsu(self.grouped_array[0][0],single_data=True)
+                if crop_mode=="auto":
+                    self.auto_crop( frame_num=0,feature_num=0)
+                elif crop_mode=="manual":
+                    for crop_obj in range(crop_object_num): 
+                        self.manual_crop( frame_num=0,feature_num=0,
+                                            std_label=True,crop_obj=crop_obj)
+            self.save_crop_coord()
+        
 
-    def activate_crop(self, frame_num=0,feature_num=0,
+    def manual_crop(self, frame_num=0,feature_num=0,
                       std_label=False,crop_obj=0): 
         #frame_num=0 #Uses the first frame
         #feature_num=0 where 0 = Amplitude      
         if crop_obj==0:
-            self.img_o, self.bin_mask=self.fs.get_otsu(self.grouped_array,frame_num,feature_num,crop_enhance=True)
-        self.roi_crop=self.cp.crop_img(
-            self.img_o,std_label, self.exp_depth, 
-            self.exp_aten,self.exp_ang, crop_obj=crop_obj
-            )
+            self.img_o, self.bin_mask=self.fs.dual_otsu(self.grouped_array,frame_num=0,feature_num=0,single_data=False)
+            #self.img_o, self.bin_mask=self.fs.dual_otsu(self.grouped_array,frame_num,feature_num,crop_enhance=True)
+        self.roi_crop, self.img_o=self.cp.crop_img(
+                                        self.img_o,std_label, self.exp_depth, 
+                                        self.exp_aten,self.exp_ang, crop_obj=crop_obj
+                                        )
+            
         self.roi_crop_pack.append(self.roi_crop)
+
+    def auto_crop(self, frame_num=0,feature_num=0,std_label=True):
+            self.img_o, self.bin_mask=self.fs.dual_otsu(self.grouped_array,frame_num=0,feature_num=0,single_data=False)
+            if std_label:
+                bbox_rename=False
+            else:
+                bbox_rename=True
+            bndboxes=self.cp.get_bbox(self.img_o,pixel_area=10)
+            _, bbox_names=self.cp.show_bbox(self.img_o,bndboxes,bbox_rename=bbox_rename)
+
+            for num,bbox_name in enumerate(bndboxes):
+                self.roi_crop.append(list(bndboxes),bbox_name,self.exp_aten,self.exp_depth,self.exp)
+                self.roi_crop_pack.append(self.roi_crop)
         
     def save_crop_coord(self,excel_filename="D:/tof/outputs/roi_coord.xlsx"):
         array=np.array(self.roi_crop_pack)
@@ -172,13 +198,12 @@ class Data_analysis():
             self.single_folder(folder_count)
             _, self.bin_mask=self.fs.get_otsu(self.grouped_array,0,0)
             self.fs.filters_eval(self.grouped_array,self.exp_depth,self.exp_aten)
-            ##############
+
             if self.exp_aten not in self.aten_list:
                 self.aten_list.append(self.exp_aten)
 
             if self.exp_depth not in self.depth_list:
                 self.depth_list.append(self.exp_depth)
-            ##############
 
             for crop_label in crop_label_list:
                 if self.exp_aten=="Sem Filtro":
@@ -416,6 +441,7 @@ class Dataframe_results():
 
         ax.legend(loc='lower right')
         plt.show()
+
 
 
         
