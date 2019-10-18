@@ -17,7 +17,6 @@ class filter():
 		return frame.astype(dtype)
 
 	def apply(self, frame):
-		h, w = frame.shape[:2]
 		frame = frame.reshape((self.height, self.width))
 		frame = self.filter(frame)
 		frame = frame.reshape((-1,1))
@@ -113,6 +112,53 @@ class edge_filter(filter):
 		# cv2.imshow('edge', edge)
 		edge = edge/edge.max()
 		frame = frame*np.abs(edge-1)
+		return frame
+
+
+class temporal_filter():
+	"""
+	Generic class for temporal filters. It constructs a history of frames
+	with length history_len and always keeps the latest frame in the last
+	position. Use method filter to create a new filter
+	"""
+	def __init__(self, history_len):
+		self.history_len = history_len
+		self.history = None
+
+	def apply(self, frame):
+		if type(self.history) == type(None):
+			self.history = frame.reshape((-1,1))
+		elif self.history.shape[1] < self.history_len:
+			self.history = np.hstack([self.history, frame.reshape((-1,1))])
+		else:
+			self.history[:,:-1] = self.history[:,1:]
+			self.history[:,-1:] = frame.reshape((-1,1))
+		frame = self.filter(frame).reshape((-1,1))
+		return frame
+
+	def filter(self, frame):
+		pass
+
+class temporal_mean_filter(temporal_filter):
+	"""
+	Use the history created to compute the mean and return
+	"""
+	def __init__(self, history_len):
+		temporal_filter.__init__(self,history_len)
+
+	def filter(self,frame):
+		frame = self.history.mean(axis=1)
+		return frame
+
+class temporal_median_filter(temporal_filter):
+	"""
+	Use the history created to compute the median and return
+	"""
+	def __init__(self, history_len):
+		temporal_filter.__init__(self,history_len)
+
+	def filter(self,frame):
+		frame = np.median(self.history, axis=1)
 		return frame
 
 def heat_map(img, norm=True):

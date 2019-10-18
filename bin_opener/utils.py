@@ -18,6 +18,7 @@ class bin_opener():
 		with open(self.file, 'rb') as f:
 			self.buffer = np.frombuffer(f.read(), dtype=self.dtype).copy()
 		self.reshape()
+		return self
 
 	def reshape(self,):
 		self.buffer = self.buffer.reshape((-1,1))
