@@ -51,7 +51,9 @@ class Depth_Error_hist(Main_Histogram):
     def loop_mask(self,amp_data,error_data):
         final_count=[]
         for pair in self.bin_pair:
+            print ("loop_mask pair ",pair)
             final_mask=self._bins_mask(amp_data,pair[0],pair[1])
+            print("loop_mask pair ",final_mask.sum())
             mask_count=self._mask_count(final_mask,error_data)
             if mask_count!=0:
                 mask_mean,mask_std=self._apply_mask(final_mask,error_data)

@@ -44,18 +44,36 @@ def main():
     #da.save_crop_coord(excel_filename=output)
 
     #################################################################
-    ### Load Crop
+    ### Load Crop Object
     #################################################################
     da.load_crop_coord(excel_filename=output, source="excel")
+
+    #################################################################
+    ### Divive crop into patches and export to excel
+    #################################################################
+    pixels=1
+    da.crop_into_patches(pixels=pixels)
+    output2="d:/tof/coord_patches_pixel_num_"+str(pixels)+".xlsx"
+    #da.df_patch_coord.to_excel(output2)
+    #output2="d:/tof/coord_patches_pixel_num_5.xlsx"
+    #################################################################
+    ### Load patch coord
+    #################################################################
+    da.load_crop_patches(excel_filename=output2,source="dataframe")
+    crop_list=da.patches_list()
+    #from IPython import embed;embed()
     #################################################################
     ### Run analysis
     #################################################################
-    da.run_data_analysis(folders_numb=12,frame_limit=30,
-                         crop_label_list=["fita_3M","mercosul","reflet","disco"])
-
+    da.run_data_analysis(folders_numb=12,
+                         frame_limit=30,
+                         crop_label_list=crop_list,
+                         mode="patch")
     #################################################################
     ### Plot analysis
     #################################################################
+    df=pd.DataFrame(da.final_count_pack,columns=["crop_label","aten","err_depth_mean","err_depth_std","amp_data_mean","amp_data_avg"])
+    df.to_excel("d:/tof/coord_patches_mean_std_"+str(pixels)+".xlsx")
     #Data_analysis.filter_plot(da.final_count_pack,da.depth_list,da.aten_list)
     #from IPython import embed;embed()
 
@@ -118,7 +136,6 @@ class Data_analysis():
                                             std_label=True,crop_obj=crop_obj)
             self.save_crop_coord()
         
-
     def manual_crop(self, frame_num=0,feature_num=0,
                       std_label=False,crop_obj=0): 
         #frame_num=0 #Uses the first frame
@@ -155,8 +172,7 @@ class Data_analysis():
         self.df_coord=pd.concat([df1,df2],axis=1)
         self.df_coord.to_excel(excel_filename)
 
-    def load_crop_coord(self,
-                       excel_filename="D:/tof/outputs/roi_coord.xlsx",
+    def load_crop_coord(self, excel_filename="D:/tof/outputs/roi_coord.xlsx",
                        dataframe=pd.DataFrame(),
                        source="dataframe"):
         #source ="dataframe" / "excel"
@@ -167,6 +183,82 @@ class Data_analysis():
                 self.df_coord=dataframe
         elif source =="excel":
             self.df_coord=pd.read_excel(excel_filename, index_col=0)
+            a=np.array(self.df_coord['roi_coord'])
+            for row in range(a.shape[0]):
+                row_ls=a[row].split("[")[1].split("]")[0].split(",")
+                for num,row_elem in enumerate(row_ls):
+                    row_ls[num]=int(row_elem)
+                row_ls=np.array(row_ls)
+                a[row]=row_ls
+            self.df_coord['roi_coord']=a
+
+    def load_crop_patches(self, excel_filename="",
+                       dataframe=pd.DataFrame(),
+                       source="dataframe"):
+        if source =="dataframe":
+            if len(dataframe)==0:
+                self.df_patch_coord=self.df_patch_coord
+            else:
+                self.df_patch_coord=dataframe
+        elif source =="excel":
+            self.df_patch_coord=pd.read_excel(excel_filename, index_col=0)
+            a=np.array(self.df_patch_coord['patch_coord'])
+            for row in range(a.shape[0]):
+                row_ls=a[row].split("[")[1].split("]")[0].split(",")
+                for num,row_elem in enumerate(row_ls):
+                    row_ls[num]=int(row_elem)
+                row_ls=np.array(row_ls)
+                a[row]=row_ls
+            self.df_patch_coord['patch_coord']=a
+        
+    def crop_into_patches(self,pixels=9):
+        self.pixel=pixels
+        patch_coord_pack=[]
+        for num,bndbox in enumerate(self.df_coord['roi_coord']):
+            count=0
+            for y in range((bndbox[3]-bndbox[1])//pixels):
+                y_0 = (y)*pixels + bndbox[1]
+                y_1 = (y+1)*pixels + bndbox[1]
+                pixels_error = []
+                for x in range((bndbox[2]-bndbox[0])//pixels):
+                    x_0 = (x)*pixels + bndbox[0]
+                    x_1 = (x+1)*pixels + bndbox[0]
+                    patch_coord=[x_0,y_0,x_1,y_1]
+
+                    patch_coord_pack.append(
+                        [self.df_coord['roi_coord'][num],
+                         self.df_coord['label'][num],
+                         self.df_coord['aten'][num],
+                         self.df_coord['depth'][num],
+                         self.df_coord['ang'][num],
+                         count, pixels,patch_coord ]
+                                      )
+                    count=count+1
+        self.df_patch_coord=pd.DataFrame(patch_coord_pack,
+                                         columns=['roi_coord_obj',
+                                                  'label_obj',
+                                                  'aten',
+                                                  'depth',
+                                                  'ang',
+                                                  'patch_num','patch_pixel','patch_coord'])
+
+    def patches_list(self):
+
+        self.df_patch_coord['full_label']='None'
+        ls=[]
+        ls1=[]
+        for row in range(self.df_patch_coord.shape[0]):
+            valA=self.df_patch_coord.loc[row,'label_obj']
+            valB=self.df_patch_coord.loc[row,'patch_num']
+            valC=self.df_patch_coord.loc[row,'depth']
+
+            strA=str(valA); strB=str(valB); strC=str(valC)
+            srtD=strA+"_patch_"+strB+"_depth="+strC
+            self.df_patch_coord.loc[row,'full_label']=srtD
+            if srtD not in ls1:
+                ls.append([valA,valB,valC])
+                ls1.append(srtD)
+        return ls1
 
     def get_crop_coord(self,crop_label="std_label-0",aten_num=1):
         if aten_num==0:
@@ -187,17 +279,47 @@ class Data_analysis():
                 roi_coord[num]=int(coord)
         return roi_coord
 
+    def get_patch_coord(self,crop_label="std_label-0",depth="",aten_num=1):
+        if aten_num==0:
+            aten_lb="Sem Filtro"
+        elif aten_num==1:
+            aten_lb="Pelicula 1"
+        
+        label=self.df_patch_coord['full_label']==crop_label
+        aten=self.df_patch_coord['aten']==aten_lb
+        #dep=self.df_patch_coord['depth']==depth
+        and_check=self.df_patch_coord[(label & aten)]
+
+        if int(and_check['depth'])!=depth:
+            roi_coord=0
+        else:
+            if len(and_check)==0:
+                print("Crop coordinates not found")
+            else:
+                roi_coord=str(and_check['patch_coord'])
+                roi_coord=roi_coord.split("[")[1].split("]")[0].split(",")
+                for num,coord in enumerate(roi_coord):
+                    roi_coord[num]=int(coord)
+        return roi_coord
+
     def run_data_analysis(self,
                           folders_numb=15,
                           frame_limit=30,
-                          crop_label_list=["std_label-0"]):
+                          crop_label_list=["std_label-0"],mode="object"):
         #### Available crop_mode = ["single","multiple"]
         self.aten_list=[]
         self.depth_list=[]
         for folder_count in range(folders_numb):
             self.single_folder(folder_count)
-            _, self.bin_mask=self.fs.get_otsu(self.grouped_array,0,0)
-            self.fs.filters_eval(self.grouped_array,self.exp_depth,self.exp_aten)
+            ################
+            amp_img, self.bin_mask=self.fs.dual_otsu(self.grouped_array[0][0],single_data=True)
+            amp_img=((amp_img/amp_img.max())*255).astype("uint8")
+            amp_img=cv2.cvtColor(amp_img,cv2.COLOR_GRAY2BGR)
+            img_name=("ExpA-Aten: "+str(self.exp_aten)+" Depth: "+str(self.exp_depth))
+            cv2.namedWindow(img_name,cv2.WINDOW_KEEPRATIO)
+            pack1=[]
+            ##############
+            #self.fs.filters_eval(self.grouped_array,self.exp_depth,self.exp_aten)
 
             if self.exp_aten not in self.aten_list:
                 self.aten_list.append(self.exp_aten)
@@ -206,59 +328,78 @@ class Data_analysis():
                 self.depth_list.append(self.exp_depth)
 
             for crop_label in crop_label_list:
+                #from IPython import embed;embed()
+                #print(self.df_patch_coord)
                 if self.exp_aten=="Sem Filtro":
                     aten_num=0
                 else:
                     aten_num=1
-                roi_coord=self.get_crop_coord(crop_label=crop_label,aten_num=aten_num)
-                error_depth_array,eda_m,amp_data,apa_m,status=self.single_object_analysis(
-                    roi_coord,crop_label)
-                #  from IPython import embed; embed()
-                if status:
-                    self.resumed_exp_data.append(( self.exp_aten, self.exp_depth,
-                                                self.exp_ang,
-                                                apa_m.mean(), apa_m.std(),
-                                                eda_m.mean(), eda_m.std()))
-                else:
-                    print("Threshold Error- Aten= ", self.exp_aten,
-                          " - Depth= ", self.exp_depth,
-                          " - Ang= ", self.exp_ang,
-                          " - Label= ", crop_label)
+                    
+                if mode=="object":
+                    roi_coord=self.get_crop_coord(crop_label=crop_label,aten_num=aten_num)
 
 
-
-
-                final_count,name=self._apply_histogram(amp_data,error_depth_array)
+                elif mode=="patch":
+                    roi_coord=self.get_patch_coord(crop_label=crop_label,depth=self.exp_depth,aten_num=aten_num)
                 
-                self.final_count_pack.append((final_count,name,crop_label))
+                if roi_coord!=0:
+            
+                    error_depth_array,amp_data=self.single_object_analysis(roi_coord,crop_label)
+                    pack=[crop_label,self.exp_aten,error_depth_array.mean(), error_depth_array.std(),
+                                                    amp_data.mean(), amp_data.std()]
+                    pt1=(roi_coord[0],roi_coord[1])
+                    pt2=(roi_coord[2],roi_coord[3])
+                    pt3=(roi_coord[2]-roi_coord[0],roi_coord[3]-roi_coord[1])
+                    if abs(error_depth_array.mean())>0.2:
+                        clr=(0,0,255)
+                        text=""
+                    elif (abs(error_depth_array.mean())<=0.2 and abs(error_depth_array.mean())>0.1):
+                        clr=(80,127,255)
+                        text=""
+
+                    elif (abs(error_depth_array.mean())<=0.1 and abs(error_depth_array.mean())>0.05):
+                        clr=(0,215,255)
+                        text=""
+                    else:
+                        clr=(0,255,0)
+                        text=""
+
+                    self.final_count_pack.append(pack)
+                    cv2.rectangle(amp_img,pt1=pt1,pt2=pt2,color=clr,thickness=1)
+                    cv2.putText(amp_img,text,pt3,cv2.FONT_HERSHEY_SIMPLEX, 1.0,color=clr)
+            amp_img=cv2.resize(amp_img,dsize=None,fx=5,fy=5)
+            cv2.imshow(img_name,amp_img)
+            filename=("Exp-Aten_"+str(self.exp_aten)+"_Depth_"+str(self.exp_depth)+"_PixelPatch_"+str(self.pixel))
+            filename="D:/tof/outputs/img"+filename+".jpg"
+            cv2.imwrite(filename,amp_img)
+            cv2.waitKey()
+        cv2.destroyAllWindows()
+        
+                #self.resumed_exp_data.append(( self.exp_aten, self.exp_depth,
+                 #                               self.exp_ang,crop_label,
+                  #                              error_depth_array.mean(), error_depth_array.std(),
+                   #                             amp_data.mean(), amp_data.std()))
+                
+
+                #final_count,name=self._apply_histogram(amp_data,error_depth_array)
+                                               
                 #final count list format [amplitude,mask_count,mask_mean,mask_std]
 
     def single_object_analysis(self,roi_coord,crop_label):
 
         cropped_array=self.cp.multi_feature_crop(self.grouped_array,roi_coord)
         cropped_mask=self.cp.single_feature_crop(self.bin_mask,roi_coord)
-
         if cropped_mask.sum()==0:
             cropped_masked_array=cropped_array
         else:   
             cropped_masked_array=self.fs.apply_mask(cropped_array,cropped_mask)
-        error_depth_array, error_mask=self.fs.apply_depth_check(
-                        cropped_masked_array,
-                        self.exp_depth,
-                        self.exp_aten,
-                        crop_label,
-                        plot_show=False)
+
+        error_depth_array=self.fs.apply_depth_check(cropped_masked_array, self.exp_depth)
+
         #### Check Effects of error mask over depth array and amp_data
         amp_data=cropped_masked_array[:,0,:,:]
-        if error_mask.sum()==0:
-            apa_m=np.array([0])
-            eda_m=np.array([0])
-            status=False
-        else:
-            apa_m=amp_data[error_mask]
-            eda_m=error_depth_array[error_mask]
-            status=True
-        return error_depth_array,eda_m,amp_data,apa_m,status
+
+        return error_depth_array,amp_data
 
     def _apply_histogram(self,amp_data,error_depth_array,plot=False):
         self.amp_h=Main_Histogram(amp_data)
@@ -287,6 +428,7 @@ class Data_analysis():
     
     @staticmethod
     def filter_plot(final_count_pack,depth_list,aten_list):
+        from IPython import embed;embed()
         for depth in depth_list:
             lst=[str(depth)]
             for aten in aten_list:

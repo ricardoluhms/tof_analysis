@@ -131,7 +131,6 @@ class Feature_show():
 
 		return final_img, final_mask
 
-
 	def get_edge(self,grouped_array,frame_num,feature_num):
 		frame_img=grouped_array[frame_num][feature_num]
 		shap=frame_img.shape
@@ -205,57 +204,9 @@ class Feature_show():
 		#         key_pressed = cv2.waitKey(0) & 0xff
 		# cv2.destroyAllWindows()
 
-	def apply_depth_check(self,any_grouped_array,exp_depth,exp_aten,exp_label,plot_show=False):
-
+	def apply_depth_check(self,any_grouped_array,exp_depth):
 		error_depth_array=any_grouped_array[:,2,:,:]-exp_depth/1000
-		depth=any_grouped_array[:,2,:,:]
-		eda=error_depth_array
-		amp_array=any_grouped_array[:,0,:,:]
-
-		eda=error_depth_array.copy()
-		eda_mask=abs(eda[:,:,:])<0.2
-		name=("GTD: "+str(exp_depth)+" -Lb: "+exp_label+"-At: "+exp_aten)
-		if plot_show==True:
-			shap=eda[0,:,:].shape
-			edge=edf(shap[0],shap[1])
-			for i in range(eda.shape[0]):
-				#if exp_aten!="Sem filtro":
-				if (exp_aten=="Pelicula 10"):
-					img0, ot_mask=self.get_otsu(any_grouped_array,i,0)
-					
-					ot_mask=ot_mask.astype("int")*254
-					ot_mask=cv2.cvtColor(ot_mask,cv2.COLOR_GRAY2RGB)
-					#from IPython import embed; embed()
-					img=eda[i]
-					img=filter.norm(img)
-					img2=depth[i]
-					img2=filter.norm(img2)
-					img3=amp_array[i]
-					img4=edge.apply(img3)
-					img3=filter.norm(img3)
-					img4=img4.reshape(shap[0],shap[1])
-					#img = cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
-					#name00=("MaskOtsu "+name)
-					name0=("AmpOtsu "+name)
-					name1=("D.Error "+name)
-					name2=("Depth "+name)
-					name3=("Amp. "+name)
-					name4=("Amp.Edge"+name)
-					self.std_window_show(name0,ot_mask)
-					self.std_window_show(name1,img)
-					self.std_window_show(name2,img2)
-					self.std_window_show(name3,img3)
-					self.std_window_show(name4,img4)
-					key_pressed = cv2.waitKey(300) & 0xff
-					if key_pressed in [32, ord('p')]:
-						key_pressed = cv2.waitKey(0) & 0xff
-			if (exp_aten=="Pelicula 10"):
-				cv2.destroyWindow(name0)
-				cv2.destroyWindow(name1)
-				cv2.destroyWindow(name2)
-				cv2.destroyWindow(name3)
-				cv2.destroyWindow(name4)
-		return error_depth_array, eda_mask
+		return error_depth_array
 
 	def apply_mask(self,any_grouped_array,mask,mask_type="binary"):
 		frames,features,_,_=any_grouped_array.shape
@@ -465,3 +416,42 @@ class Crop(Feature_show):
 			cv2.namedWindow('z_bndboxes-blob_'+str(bbox_num),cv2.WINDOW_KEEPRATIO)
 			cv2.imshow('z_bndboxes-blob_'+str(bbox_num), z_bndboxes)
 		return pixels_error
+	
+
+		# error = (depth-1.013)
+		# # error = (depth-3.009)
+		# # error = (depth-4.834)
+		# mean = depth[mask!=0].mean(); std = depth[mask!=0].std()
+		# measure = depth[np.bitwise_and(mask!=0,np.bitwise_and(depth>=mean-2*std, depth<=mean+2*std))]
+		# print('measure:%f+-%f [m]'%(measure.mean(),measure.std()))
+		# print('  error:%f+-%f [m]'%(error[mask!=0].mean(),error[mask!=0].std()))
+
+		# ===============================================================
+		# 			drawing squares and computing error per square
+		# ===============================================================
+		z_bndboxes = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+		#z_bndboxes = filter.norm(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
+		pixels = 20
+		for obj,bndbox in enumerate(bndboxes):
+
+			color=int(np.array(255/(1+(obj/2))).astype("uint8"))
+			z_bndboxes = cv2.rectangle(z_bndboxes, (bndbox[0], bndbox[1]), (bndbox[2], bndbox[3]), (255,color,color), 1)
+			text="blob_"+str(obj)
+			cv2.putText(z_bndboxes, text, (bndbox[0], bndbox[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,color,color), lineType=cv2.LINE_AA)
+			for y in range((bndbox[3]-bndbox[1])//pixels):
+				y_0 = (y)*pixels + bndbox[1]
+				y_1 = (y+1)*pixels + bndbox[1]
+				pixels_error = []
+				for x in range((bndbox[2]-bndbox[0])//pixels):
+					x_0 = (x)*pixels + bndbox[0]
+					x_1 = (x+1)*pixels + bndbox[0] 
+					pixels_mask = np.zeros(z_bndboxes.shape[:2], dtype='uint8')
+					pixels_mask[y_0:y_1, x_0:x_1] = 1
+					pixels_error.append(error[np.bitwise_and(mask!=0, pixels_mask!=0)].mean())
+					# z_bndboxes = cv2.putText(z_bndboxes, '%.4f'%pixels_error, (x_0, y_0), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,0,0))
+					z_bndboxes = cv2.rectangle(z_bndboxes, (x_0, y_0), (x_1, y_1), (255,0,0), 1)
+				print(pixels_error)
+				print('-'*90)
+			print('*'*90)
+		cv2.namedWindow('z_bndboxes',cv2.WINDOW_KEEPRATIO)
+		cv2.imshow('z_bndboxes', z_bndboxes)
