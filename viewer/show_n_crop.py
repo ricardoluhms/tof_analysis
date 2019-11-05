@@ -131,6 +131,40 @@ class Feature_show():
 
 		return final_img, final_mask
 
+	@staticmethod
+	#under development
+	def four_ostu(grouped_array,frame_num=0,feature_num=0):
+		### raw frame
+		thres_mask_ls={}
+		fs=Feature_show()
+		frame_img=grouped_array[frame_num][feature_num]
+		### check exploding and normalize input
+		img=filter.norm(fs._check_exploding(frame_img))
+
+	
+		### Get first Threshold
+		mask = cv2.threshold(img,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
+		### Upper Mask
+		mask2=(mask==255)
+		### Lower mask 
+		mask3=np.logical_not(mask2)
+
+		### Remaining data for second threshold lower limit and upper
+		img2=img*mask2
+		img3=img*mask3
+
+		### Get Second Threshold Lower and Upper
+		maskU = cv2.threshold(img2,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1] #Upper
+		maskL = cv2.threshold(img3,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1] #Lower
+		
+		### Second mask
+		maskU1=(maskU==255)
+		maskU2=np.logical_not(maskU1)
+
+		maskL1=(maskL==255)
+		maskL2=np.logical_not(maskL1)
+		return maskU1,maskU2,maskL1,maskL2 
+
 	def get_edge(self,grouped_array,frame_num,feature_num):
 		frame_img=grouped_array[frame_num][feature_num]
 		shap=frame_img.shape
@@ -204,8 +238,11 @@ class Feature_show():
 		#         key_pressed = cv2.waitKey(0) & 0xff
 		# cv2.destroyAllWindows()
 
-	def apply_depth_check(self,any_grouped_array,exp_depth):
-		error_depth_array=any_grouped_array[:,2,:,:]-exp_depth/1000
+	def apply_depth_check(self,any_grouped_array,exp_depth,depth_max=7500):
+		if exp_depth>depth_max:
+			error_depth_array=(any_grouped_array[:,2,:,:]+depth_max/1000)-exp_depth/1000
+		else:	
+			error_depth_array=any_grouped_array[:,2,:,:]-exp_depth/1000
 		return error_depth_array
 
 	def apply_mask(self,any_grouped_array,mask,mask_type="binary"):
@@ -247,7 +284,7 @@ class Crop(Feature_show):
 		roi_img = img.copy()
 		window_name=("Crop object number= "+str(crop_obj)+
 					 " - Depth= "+str(exp_depth)+
-					 " - Angle= "+str(exp_aten)) 
+					 " - Atenuador= "+str(exp_aten)) 
 
 		cv2.namedWindow(window_name,cv2.WINDOW_KEEPRATIO)
 		cv2.setMouseCallback(window_name, self.click_and_crop)

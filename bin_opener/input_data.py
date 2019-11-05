@@ -78,6 +78,14 @@ class Input_data(Headers):
         frame_i_j_pack=self._create_frame_track(i_j_pack,frames)
         return frame_i_j_pack
 
+    def rename_amplitude(self):
+        valid_files = ".bin"
+        for file in os.listdir(self.input_folder):
+            if (file.endswith(valid_files)and file.split('.')[0]=="Amplitude"):
+                old=self.input_folder+'/'+file
+                new=self.input_folder+'/0'+file
+                os.rename(old, new)
+                
     def file_list(self,show_file=False):
         valid_files = ".bin"
         for file in os.listdir(self.input_folder):
@@ -171,9 +179,10 @@ class Input_data(Headers):
 class Mfolder():
     def __init__ (self,all_exp_folder):
         self.all_exp_folder=all_exp_folder
-        self.folder_path_list=[]
+        
 
     def swipe_folders(self):
+        self.folder_path_list=[]
         for folder in os.listdir(self.all_exp_folder):
             n_f_path=os.path.join(self.all_exp_folder,folder)       
             if os.path.isdir(n_f_path): 
