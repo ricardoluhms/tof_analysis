@@ -21,7 +21,6 @@ class pcv():#point cloud viewer
 		for channel in range(point_cloud.shape[1]):
 			frame = point_cloud[:,channel].reshape((height, width))
 			frame = pcv.norm(frame)
-			cv2.imshow(window_name, frame)
 			frames.append(frame)
 		frames = np.hstack(frames)
 		cv2.imshow(window_name, frames)
