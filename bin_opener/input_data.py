@@ -180,7 +180,6 @@ class Mfolder():
     def __init__ (self,all_exp_folder):
         self.all_exp_folder=all_exp_folder
         
-
     def swipe_folders(self):
         self.folder_path_list=[]
         for folder in os.listdir(self.all_exp_folder):
