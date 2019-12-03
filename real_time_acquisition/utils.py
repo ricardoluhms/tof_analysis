@@ -51,7 +51,10 @@ class ti_tof():
 				q_out.put(buf, timeout=0)
 
 	def read(self,):
-		buf = self.q_out.get()
+		try:
+			buf = self.q_out.get(timeout=1)
+		except:
+			return False, None
 		begin = 0
 		output = []
 		for s in self.output_format:
@@ -59,7 +62,7 @@ class ti_tof():
 			data = np.frombuffer(buf[begin:begin+end], dtype=s[0]).copy().reshape((-1,1))
 			output.append(data)
 			begin = begin+end
-		return output
+		return True, output
 
 	def release(self,):
 		self.p.terminate()
@@ -89,6 +92,9 @@ class point_cloud(ti_tof):
 		])
 
 	def read(self,):
-		buf = self.q_out.get()
+		try:
+			buf = self.q_out.get(timeout=1)
+		except:
+			return False, None
 		data = np.frombuffer(buf[:-self.output_format[0][1]*240*320], dtype=self.output_format[0][0]).copy().reshape((-1,3))
-		return [data[:,0:1], data[:,1:2], data[:,2:3]]
+		return True, [data[:,0:1], data[:,1:2], data[:,2:3]]
