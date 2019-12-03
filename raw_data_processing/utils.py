@@ -1,4 +1,7 @@
 import numpy as np
+'''
+Review if it should be put into ONE class instead!
+'''
 class processor():
 	def __init__(self, height, width, f1, f2, focal_length, pixel_size, dealiased_mask):
 		self.height = height
@@ -31,65 +34,19 @@ class processor():
 		self.ma = f1/self.freq
 		self.mb = f2/self.freq
 
+	def process(self):
+		pass
 
-	def depth2point_cloud(self, z):
-		z = z.reshape((-1,1))
-		x = z*np.tan(self.x_alpha)
-		y = z*np.tan(self.y_alpha)
-		point_cloud = np.hstack([x,y,z])
-		return point_cloud.astype('float32')
-
+class phase2depth(processor):
+	def __init__(self, height, width,f1=4e7,f2=6e7,focal_length=3.33e-3,pixel_size=15e-6,dealiased_mask=2, filter=None):
+		processor.__init__(self, height, width,f1,f2,focal_length,pixel_size,dealiased_mask)
+		self.filter = filter
 
 	def phase2distance(self, phase):
 		phase[phase>2**12-1] = 2**12-1
 		phase = phase.reshape((-1,1))
 		distance = (phase*self.R*2**(5-self.dealiased_mask))/(self.ma*self.mb*2**12)
 		return distance
-		'''
-		 Y  |  X  | phs 
-		120 | 186 | 480
-		120 | 160 | 484 
-		 94 |  68 | 528
-		134 | 122 | 498
-		'''
-		'''
-		self.R = 9.9
-		print(self.freq)
-		print(self.R)
-		phase[:,:] = 480
-		distance = phase*self.R/4095
-		depth = distance*np.cos(self.beta)
-		print(distance.reshape((240,320))[120,186], phase.reshape((240,320))[120,186])
-		print(depth.reshape((240,320))[120,186], phase.reshape((240,320))[120,186])
-
-		phase[:,:] = 1456
-		distance = phase*self.R/4095
-		depth = distance*np.cos(self.beta)
-		print(distance.reshape((240,320))[120,160], phase.reshape((240,320))[120,160])
-		print(depth.reshape((240,320))[120,160], phase.reshape((240,320))[120,160])
-
-		phase[:,:] = 528
-		distance = phase*self.R/4095
-		depth = distance*np.cos(self.beta)
-		print(distance.reshape((240,320))[94,68], phase.reshape((240,320))[94,68])
-		print(depth.reshape((240,320))[94,68], phase.reshape((240,320))[94,68])
-
-		phase[:,:] = 498
-		distance = phase*self.R/4095
-		depth = distance*np.cos(self.beta)
-		print(distance.reshape((240,320))[134,122], phase.reshape((240,320))[134,122])
-		print(depth.reshape((240,320))[134,122], phase.reshape((240,320))[134,122])
-		exit()
-		'''
-
-	def process(self):
-		pass
-
-
-class phase2depth(processor):
-	def __init__(self, height, width,f1=4e7,f2=6e7,focal_length=3.33e-3,pixel_size=15e-6,dealiased_mask=2, filter=None):
-		processor.__init__(self, height, width,f1,f2,focal_length,pixel_size,dealiased_mask)
-		self.filter = filter
 
 	def process(self, phase):
 		distance = self.phase2distance(phase)
@@ -98,27 +55,33 @@ class phase2depth(processor):
 			depth = self.filter.apply(depth)
 		return depth.astype('float32')
 
-
-class phase2point_cloud(processor):
+class depth2point_cloud(processor):
 	def __init__(self, height, width,f1=4e7,f2=6e7,focal_length=3.33e-3,pixel_size=15e-6,dealiased_mask=2, filter=None):
 		processor.__init__(self, height, width,f1,f2,focal_length,pixel_size,dealiased_mask)
 		self.filter = filter
 
-	def process(self, phase):
-		distance = self.phase2distance(phase)
-		z = distance*np.cos(self.beta)
+	def depth2point_cloud(self, z):
+		z = z.reshape((-1,1))
+		x = z*np.tan(self.x_alpha)
+		y = z*np.tan(self.y_alpha)
+		point_cloud = np.hstack([x,y,z])
+		return point_cloud.astype('float32')
+
+	def process(self, z):
 		if type(self.filter) != type(None):
 			z = self.filter.apply(z)
 		point_cloud = self.depth2point_cloud(z)
 		return point_cloud.astype('float32')
 
 
-class depth2point_cloud(processor):
+class phase2point_cloud(phase2depth,depth2point_cloud):
 	def __init__(self, height, width,f1=4e7,f2=6e7,focal_length=3.33e-3,pixel_size=15e-6,dealiased_mask=2, filter=None):
-		processor.__init__(self, height, width,f1,f2,focal_length,pixel_size,dealiased_mask)
+		phase2depth.__init__(self, height, width,f1,f2,focal_length,pixel_size,dealiased_mask)
 		self.filter = filter
 
-	def process(self, z):
+	def process(self, phase):
+		distance = self.phase2distance(phase)
+		z = distance*np.cos(self.beta)
 		if type(self.filter) != type(None):
 			z = self.filter.apply(z)
 		point_cloud = self.depth2point_cloud(z)

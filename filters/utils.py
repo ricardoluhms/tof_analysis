@@ -13,7 +13,7 @@ class filter():
 	def	norm(frame, max=255, dtype='uint8'):
 		frame = frame - frame.min()
 		if frame.max() != 0:
-			frame = (max*frame/frame.max())
+			frame = max*(frame/frame.max())
 		return frame.astype(dtype)
 
 	def apply(self, frame):
@@ -69,7 +69,7 @@ class mean_filter(filter_int):
 		self.kernel_size = kernel_size
 
 	def filter(self, frame):
-		frame = cv2.blur(filter.norm(frame), (self.kernel_size,self.kernel_size))
+		frame = cv2.blur(frame, (self.kernel_size,self.kernel_size))
 		return frame
 
 
@@ -109,13 +109,11 @@ class weighted_least_square_filter(filter_int):
 		self.std_color = std_color
 		self.std_space = std_space
 		
-
-		self.x, self.y = np.meshgrid(np.arange(0,(self.height)*(self.width), dtype='uint16'), np.arange(0,(self.height)*(self.width), dtype='uint16'))
-		self.A = np.zeros((self.height*self.width), dtype='float')
+		self.x, self.y = np.meshgrid(np.arange(0,(self.width), dtype='uint16'), np.arange(0,self.height, dtype='uint16'))
 
 
 	def filter(self, frame):
-		w = np.exp(-np.square(self.x.ravel()-self.y.ravel())/(2*np.square(self.std_space)))*np.exp(-np.square(frame.ravel()[self.x.ravel()]-frame.ravel()[self.y.ravel()])/(2*np.square(self.std_color)))
+		w = np.exp(-np.square(np.square(self.x_i.ravel()-self.x_j.ravel())-np.square(self.y_i.ravel()-self.y_j.ravel()))/(2*np.square(self.std_space)))*np.exp(-np.square(frame[self.y_i.ravel(), self.x_i.ravel()]-frame[self.y_j.ravel(), self.x_j.ravel()])/(2*np.square(self.std_color)))
 		return frame
 
 
