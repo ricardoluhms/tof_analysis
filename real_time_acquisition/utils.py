@@ -37,13 +37,13 @@ class ti_tof():
 			'-f', 'none',
 			'-n', '1',
 			'-t', self.mode
-		# ], stdout=sp.PIPE, bufsize = self.bufsize)
-		], stdout=sp.PIPE, stderr=sp.PIPE, bufsize = self.bufsize)
+		], stdout=sp.PIPE, bufsize = self.bufsize)
+		# ], stdout=sp.PIPE, stderr=sp.PIPE, bufsize = self.bufsize)
 		p.stdout.readline()
 		p.stdout.readline()
 		while 1:
 			buf = p.stdout.read(self.bufsize)
-			time.sleep(0.015)
+			# print(len(buf))
 			try:
 				q_out.put(buf, timeout=0)
 			except:
@@ -54,12 +54,14 @@ class ti_tof():
 		try:
 			buf = self.q_out.get(timeout=1)
 		except:
-			return False, None
+			return False, [None]*len(self.output_format)
 		begin = 0
 		output = []
 		for s in self.output_format:
 			end = 240*320*s[1]
 			data = np.frombuffer(buf[begin:begin+end], dtype=s[0]).copy().reshape((-1,1))
+			if data.size == 0:
+				return False, [None]*len(self.output_format)
 			output.append(data)
 			begin = begin+end
 		return True, output
@@ -80,6 +82,7 @@ class raw_processed(ti_tof):
 			['uint16', 2],
 			['uint16', 2],
 			['uint8', 1],
+			['uint8', 1],
 		])
 
 class point_cloud(ti_tof):
@@ -95,6 +98,9 @@ class point_cloud(ti_tof):
 		try:
 			buf = self.q_out.get(timeout=1)
 		except:
-			return False, None
+			return False, [None, None, None]
 		data = np.frombuffer(buf[:-self.output_format[0][1]*240*320], dtype=self.output_format[0][0]).copy().reshape((-1,3))
-		return True, [data[:,0:1], data[:,1:2], data[:,2:3]]
+		if data.size == 0:
+			return False, [None]*len(self.output_format)
+		else:
+			return True, [data[:,0:1], data[:,1:2], data[:,2:3]]
