@@ -138,6 +138,11 @@ def callback(event,x,y,flags,param):
 
 m = mouse()
 class interface():
+	'''
+	Class to add click and drag function to create bndboxes. The get_frame method and main method should be overwritten
+	by a child class in order to pass the frame and process the acquired information, also the loop method should be 
+	used to run the code. Example bellow...
+	'''
 	def __init__(self,):
 		self.keep_going = True
 		self.key_pressed = None
@@ -152,7 +157,7 @@ class interface():
 		self.bndbox2insert = np.array([0,0,0,0])
 
 	def get_frame(self):
-		pass
+		return None
 
 	def main(self):
 		pass

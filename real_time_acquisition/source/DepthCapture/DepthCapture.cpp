@@ -195,7 +195,7 @@ int main(int argc, char *argv[])
   // return 0;
 
 
-  uint32_t address{0x5c01}, firmware{0};
+  uint32_t address{0x5c01}, firmware{0}, TSensor{0}, TIllum{0};
   uint8_t major{0}, minor{0}, device{0};
   Ptr<RegisterProgrammer> programmer = depthCamera->getProgrammer();
   programmer->readRegister(address, firmware);
@@ -205,6 +205,7 @@ int main(int argc, char *argv[])
   std::cerr<<"firmware: "<< (int)major<<"."<<(int)minor <<std::endl;
   std::cerr<<"device: "<< (int)device <<std::endl;
   std::cerr<<"--------------------------------------------------\n";
+  
 
   // address =0x5c4c;
   // uint32_t value2get{0}, value2set{0b101000000}, mask{0b11111111111111111111111000111111};
@@ -354,9 +355,16 @@ int main(int argc, char *argv[])
 
       lastTimeStamp = d->timestamp;
 
+      std::vector<unsigned char> buffer_info(8);
+      programmer->readRegister(0x5c61, TSensor);
+      programmer->readRegister(0x5c62, TIllum);
+      memcpy(&buffer_info[0], &TSensor, 4);
+      memcpy(&buffer_info[4], &TIllum, 4);
       //send data through the pipe
       std::vector<unsigned char> buffer0(d->data.size());
       memcpy(&buffer0[0], &d->data[0], d->data.size());
+      is.rdbuf()->pubsetbuf(reinterpret_cast<char*>(&buffer_info[0]), buffer_info.size());
+      std::cout << is.rdbuf();
       is.rdbuf()->pubsetbuf(reinterpret_cast<char*>(&buffer0[0]), buffer0.size());
       std::cout << is.rdbuf();
 
@@ -383,7 +391,12 @@ int main(int argc, char *argv[])
       std::cerr << std::endl;*/
 
       lastTimeStamp = d->timestamp;
-      
+
+      std::vector<unsigned char> buffer_info(8);
+      programmer->readRegister(0x5c61, TSensor);
+      programmer->readRegister(0x5c62, TIllum);
+      memcpy(&buffer_info[0], &TSensor, 4);
+      memcpy(&buffer_info[4], &TIllum, 4);
       //send data through the pipe
       std::vector<unsigned char> buffer0(d->phaseWordWidth()*d->size.width*d->size.height);
       std::vector<unsigned char> buffer1(d->amplitudeWordWidth()*d->size.width*d->size.height);
@@ -393,6 +406,8 @@ int main(int argc, char *argv[])
       memcpy(&buffer1[0], &d->amplitude()[0], d->amplitudeWordWidth()*d->size.width*d->size.height);
       memcpy(&buffer2[0], &d->ambient()[0], d->ambientWordWidth()*d->size.width*d->size.height);
       memcpy(&buffer3[0], &d->flags()[0], d->flagsWordWidth()*d->size.width*d->size.height);
+      is.rdbuf()->pubsetbuf(reinterpret_cast<char*>(&buffer_info[0]), buffer_info.size());
+      std::cout << is.rdbuf();
       is.rdbuf()->pubsetbuf(reinterpret_cast<char*>(&buffer0[0]), buffer0.size());
       std::cout << is.rdbuf();
       is.rdbuf()->pubsetbuf(reinterpret_cast<char*>(&buffer1[0]), buffer1.size());
@@ -427,11 +442,18 @@ int main(int argc, char *argv[])
       lastTimeStamp = d->timestamp;
 
       // count++;
+      std::vector<unsigned char> buffer_info(8);
+      programmer->readRegister(0x5c61, TSensor);
+      programmer->readRegister(0x5c62, TIllum);
+      memcpy(&buffer_info[0], &TSensor, 4);
+      memcpy(&buffer_info[4], &TIllum, 4);
       //send data through the pipe
       std::vector<unsigned char> buffer0(1*sizeof(float)*d->size.width*d->size.height);
       std::vector<unsigned char> buffer1(1*sizeof(float)*d->size.width*d->size.height);
       memcpy(&buffer0[0], &d->depth[0], sizeof(float)*d->size.width*d->size.height);
       memcpy(&buffer1[0], &d->amplitude[0], sizeof(float)*d->size.width*d->size.height);
+      is.rdbuf()->pubsetbuf(reinterpret_cast<char*>(&buffer_info[0]), buffer_info.size());
+      std::cout << is.rdbuf();
       is.rdbuf()->pubsetbuf(reinterpret_cast<char*>(&buffer0[0]), buffer0.size());
       std::cout << is.rdbuf();
       is.rdbuf()->pubsetbuf(reinterpret_cast<char*>(&buffer1[0]), buffer1.size());

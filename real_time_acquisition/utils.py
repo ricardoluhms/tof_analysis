@@ -9,6 +9,7 @@ class ti_tof():
 		self.mode = mode
 		self.output_format = output_format
 		self.bufsize = None; self.get_bufsize()
+		self.tsensor = None; self.tillum = None
 		self.q_out = mp.Queue(10)
 		self.p = mp.Process(target=ti_tof.capture, args=(self,self.q_out,))
 		self.p.start()
@@ -42,7 +43,7 @@ class ti_tof():
 		p.stdout.readline()
 		p.stdout.readline()
 		while 1:
-			buf = p.stdout.read(self.bufsize)
+			buf = p.stdout.read(self.bufsize+8)
 			# print(len(buf))
 			try:
 				q_out.put(buf, timeout=0)
@@ -57,11 +58,15 @@ class ti_tof():
 			return False, [None]*len(self.output_format)
 		begin = 0
 		output = []
+		info = np.frombuffer(buf[:8], dtype='uint32')
+		if info.size == 0:
+			return False, [None]*len(self.output_format)
+		self.tsensor = info[0]
+		self.tillum = info[1]
+		buf = buf[8:]
 		for s in self.output_format:
 			end = 240*320*s[1]
 			data = np.frombuffer(buf[begin:begin+end], dtype=s[0]).copy().reshape((-1,1))
-			if data.size == 0:
-				return False, [None]*len(self.output_format)
 			output.append(data)
 			begin = begin+end
 		return True, output

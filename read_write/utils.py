@@ -12,6 +12,9 @@ def check_dir(dir):
 		path += d + '/'
 
 class writer():
+	'''
+	Class that writes a binary file with the following header:height\nwidth\ndtype\n.After the header the array is dumped
+	'''
 	def __init__(self,file_name,height=240,width=320,dtype='uint16'):
 		self.f = open(file_name, 'wb')
 		self.f.write(np.array(height, dtype='uint32').tobytes())
@@ -29,6 +32,9 @@ class writer():
 		self.f.flush()
 
 class reader():
+	'''
+	Class that reads writer's binary file frame by frame
+	'''
 	def __init__(self,file_name):
 		self.f = open(file_name, 'rb')
 		self.f.seek(0, 2);file_size = self.f.tell();self.f.seek(0, 0)
