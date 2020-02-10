@@ -1,3 +1,0 @@
-/home/vinicius/utils/tof/real_time_acquisition/source/DepthCapture/build/CMakeFiles/edit_cache.dir
-/home/vinicius/utils/tof/real_time_acquisition/source/DepthCapture/build/CMakeFiles/DepthCapture.dir
-/home/vinicius/utils/tof/real_time_acquisition/source/DepthCapture/build/CMakeFiles/rebuild_cache.dir

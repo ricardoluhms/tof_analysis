@@ -1,1 +1,0 @@
-/usr/bin/c++      CMakeFiles/write2hardware.dir/write2hardware.cpp.o  -o write2hardware -rdynamic /usr/lib/libvoxel.so.0.6.10 -lusb-1.0 -ldl 

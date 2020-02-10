@@ -1,1 +1,0 @@
-/usr/bin/c++      CMakeFiles/DepthCapture.dir/DepthCapture.cpp.o  -o DepthCapture -rdynamic /usr/lib/libvoxel.so.0.6.10 -lusb-1.0 -ldl 

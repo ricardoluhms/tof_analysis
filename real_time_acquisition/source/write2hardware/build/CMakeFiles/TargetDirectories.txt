@@ -1,3 +1,0 @@
-/home/vinicius/utils/tof/real_time_acquisition/source/write2hardware/build/CMakeFiles/edit_cache.dir
-/home/vinicius/utils/tof/real_time_acquisition/source/write2hardware/build/CMakeFiles/write2hardware.dir
-/home/vinicius/utils/tof/real_time_acquisition/source/write2hardware/build/CMakeFiles/rebuild_cache.dir
