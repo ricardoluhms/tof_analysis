@@ -1,0 +1,110 @@
+from read_write.utils import *
+from raw_data_processing.utils import *
+from filters.utils import *
+from viewer.utils import *
+from interface.utils import *
+import cv2, numpy as np
+
+class gui(interface):
+	def __init__(self):
+		interface.__init__(self)
+		self.x, self.y, self.z, self.amplitude = None, None, None, None
+		self.pc = np.zeros((240*320,3), dtype='float32')
+		self.scale=2
+		self.font_size=1
+		self.select = 0
+
+		self.exp_dir = '/home/vinicius/tof/texas/record/05022020/exp4/'
+		self.x_writer = reader(self.exp_dir+'x.out')
+		self.y_writer = reader(self.exp_dir+'y.out')
+		self.z_writer = reader(self.exp_dir+'z.out')
+		self.amplitude_writer = reader(self.exp_dir+'amplitude.out')
+
+	def get_frame(self):
+	
+		ret, self.x = self.x_reader.read()
+		_, self.y = self.y_reader.read()
+		_, self.z = self.z_reader.read()
+		_, self.amplitude = self.amplitude_reader.read()
+		if not ret:
+			self.x_reader.reset()
+			self.y_reader.reset()
+			self.z_reader.reset()
+			self.amplitude_reader.reset()
+
+
+		'''
+		Select which image to show in the click and drag window
+		'''
+		if self.select==0:
+			img2show = pcv.heat_map(self.amplitude.reshape((240,320)))
+			img2show = cv2.putText(img2show, 'amp', (0,15), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0,0,0), 2)
+			img2show = cv2.putText(img2show, 'amp', (0,15), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,255), 1)
+		elif self.select==1:
+			img2show = pcv.heat_map(self.z.reshape((240,320)))
+			img2show = cv2.putText(img2show, 'dpth', (0,15), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0,0,0), 2)
+			img2show = cv2.putText(img2show, 'dpth', (0,15), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,255), 1)
+		return img2show
+
+	def main(self):
+		amplitude = self.amplitude.reshape((240,320))
+		phase = self.phase.reshape((240,320))
+		ambient = self.ambient.reshape((240,320))
+		depth = self.depth.reshape((240,320))
+		phase_z = (self.phase*np.cos(self.phase_processor.beta)).reshape((240,320))
+
+		'''
+		If there's any bndbox in the screen it will show the mean+-std of amplitude, phase, ambient and depth
+		'''
+		self.img2show = cv2.resize(self.img2show, (self.img2show.shape[1]*self.scale, self.img2show.shape[0]*self.scale))
+		for bndbox in self.bndboxes:
+			mean_amp = amplitude[bndbox[1]:bndbox[3], bndbox[0]:bndbox[2]].mean()
+			std_amp = amplitude[bndbox[1]:bndbox[3], bndbox[0]:bndbox[2]].std()
+			cv2.putText(self.img2show, 'amp:%.1f+-%.1f'%(mean_amp,std_amp), (self.scale*bndbox[2], self.scale*bndbox[1]-5), cv2.FONT_HERSHEY_COMPLEX_SMALL, self.font_size, (0,0,0), 3)
+			cv2.putText(self.img2show, 'amp:%.1f+-%.1f'%(mean_amp,std_amp), (self.scale*bndbox[2], self.scale*bndbox[1]-5), cv2.FONT_HERSHEY_COMPLEX_SMALL, self.font_size, (255,255,255), 2)
+
+			mean_phs = phase[bndbox[1]:bndbox[3], bndbox[0]:bndbox[2]].mean()
+			std_phs = phase[bndbox[1]:bndbox[3], bndbox[0]:bndbox[2]].std()
+			cv2.putText(self.img2show, 'phs:%.1f+-%.1f'%(mean_phs,std_phs), (self.scale*bndbox[2], self.scale*bndbox[1]+20), cv2.FONT_HERSHEY_COMPLEX_SMALL, self.font_size, (0,0,0), 3)
+			cv2.putText(self.img2show, 'phs:%.1f+-%.1f'%(mean_phs,std_phs), (self.scale*bndbox[2], self.scale*bndbox[1]+20), cv2.FONT_HERSHEY_COMPLEX_SMALL, self.font_size, (255,255,255), 2)
+
+			mean_phsz = phase_z[bndbox[1]:bndbox[3], bndbox[0]:bndbox[2]].mean()
+			std_phsz = phase_z[bndbox[1]:bndbox[3], bndbox[0]:bndbox[2]].std()
+			cv2.putText(self.img2show, 'phsz:%.1f+-%.1f'%(mean_phsz,std_phsz), (self.scale*bndbox[2], self.scale*bndbox[1]+45), cv2.FONT_HERSHEY_COMPLEX_SMALL, self.font_size, (0,0,0), 3)
+			cv2.putText(self.img2show, 'phsz:%.1f+-%.1f'%(mean_phsz,std_phsz), (self.scale*bndbox[2], self.scale*bndbox[1]+45), cv2.FONT_HERSHEY_COMPLEX_SMALL, self.font_size, (255,255,255), 2)
+
+			mean_amb = ambient[bndbox[1]:bndbox[3], bndbox[0]:bndbox[2]].mean()
+			std_amb = ambient[bndbox[1]:bndbox[3], bndbox[0]:bndbox[2]].std()
+			cv2.putText(self.img2show, 'amb:%.1f+-%.1f'%(mean_amb,std_amb), (self.scale*bndbox[2], self.scale*bndbox[1]+70), cv2.FONT_HERSHEY_COMPLEX_SMALL, self.font_size, (0,0,0), 3)
+			cv2.putText(self.img2show, 'amb:%.1f+-%.1f'%(mean_amb,std_amb), (self.scale*bndbox[2], self.scale*bndbox[1]+70), cv2.FONT_HERSHEY_COMPLEX_SMALL, self.font_size, (255,255,255), 2)
+
+			mean_dep = depth[bndbox[1]:bndbox[3], bndbox[0]:bndbox[2]].mean()
+			std_dep = depth[bndbox[1]:bndbox[3], bndbox[0]:bndbox[2]].std()
+			cv2.putText(self.img2show, 'dph:%.2f+-%.2f'%(mean_dep,std_dep), (self.scale*bndbox[2], self.scale*bndbox[1]+95), cv2.FONT_HERSHEY_COMPLEX_SMALL, self.font_size, (0,0,0), 3)
+			cv2.putText(self.img2show, 'dph:%.2f+-%.2f'%(mean_dep,std_dep), (self.scale*bndbox[2], self.scale*bndbox[1]+95), cv2.FONT_HERSHEY_COMPLEX_SMALL, self.font_size, (255,255,255), 2)
+
+		self.img2show = cv2.resize(self.img2show, (self.img2show.shape[1]//self.scale, self.img2show.shape[0]//self.scale))
+
+		cv2.imshow('',self.img2show)
+
+		'''
+		Section to handle keys
+		'''
+		key_pressed = cv2.waitKey(1000//60) & 0xff
+		if key_pressed in [32, ord('p')]:
+			key_pressed = cv2.waitKey() & 0xff
+		if key_pressed in [27, ord('q')]:
+			self.keep_going = False
+		if key_pressed == ord('s'):
+			self.pc = self.depth_processor.process(self.depth)
+			pcv.pcshow(self.pc)
+		if key_pressed == ord(','):
+			self.select = 1 if self.select==0 else self.select-1
+		if key_pressed == ord('.'):
+			self.select = 0 if self.select==1 else self.select+1
+
+
+if __name__=='__main__':
+	a = gui()
+	a.loop()
+	a.cap.release()
