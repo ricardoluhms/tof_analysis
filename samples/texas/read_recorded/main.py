@@ -12,26 +12,33 @@ class gui(interface):
 		self.pc = np.zeros((240*320,3), dtype='float32')
 		self.scale=2
 		self.font_size=1
+		self.phase_processor = phase2depth(240, 320,f1=16e6,f2=24e6,focal_length=3.33e-3,pixel_size=15e-6,dealiased_mask=2, filter=None)
 		self.select = 0
 
+		dist = '4340'
+		# self.exp_dir = '/home/vinicius/tof/texas/record/04022020/exp1/%s/'%dist
 		self.exp_dir = '/home/vinicius/tof/texas/record/05022020/exp4/'
-		self.x_writer = reader(self.exp_dir+'x.out')
-		self.y_writer = reader(self.exp_dir+'y.out')
-		self.z_writer = reader(self.exp_dir+'z.out')
-		self.amplitude_writer = reader(self.exp_dir+'amplitude.out')
+		self.phase_reader = reader(self.exp_dir+'phase.out')
+		self.amplitude_reader = reader(self.exp_dir+'amplitude.out')
+		self.ambient_reader = reader(self.exp_dir+'ambient.out')
+		self.flags_reader = reader(self.exp_dir+'flags.out')
+
+		self.camera_matrix = np.load('camera_matrix.npz')
+		self.mapx = self.camera_matrix['mapx']; self.mapy = self.camera_matrix['mapy']
 
 	def get_frame(self):
 	
-		ret, self.x = self.x_reader.read()
-		_, self.y = self.y_reader.read()
-		_, self.z = self.z_reader.read()
+		ret, self.phase = self.phase_reader.read()
 		_, self.amplitude = self.amplitude_reader.read()
+		_, self.ambient = self.ambient_reader.read()
+		_, self.flags = self.flags_reader.read()
 		if not ret:
-			self.x_reader.reset()
-			self.y_reader.reset()
-			self.z_reader.reset()
+			self.phase_reader.reset()
 			self.amplitude_reader.reset()
+			self.ambient_reader.reset()
+			self.flags_reader.reset()
 
+		self.depth = self.phase_processor.process(self.phase)
 
 		'''
 		Select which image to show in the click and drag window
@@ -41,9 +48,17 @@ class gui(interface):
 			img2show = cv2.putText(img2show, 'amp', (0,15), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0,0,0), 2)
 			img2show = cv2.putText(img2show, 'amp', (0,15), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,255), 1)
 		elif self.select==1:
-			img2show = pcv.heat_map(self.z.reshape((240,320)))
+			img2show = pcv.heat_map(self.phase.reshape((240,320)))
+			img2show = cv2.putText(img2show, 'phs', (0,15), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0,0,0), 2)
+			img2show = cv2.putText(img2show, 'phs', (0,15), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,255), 1)
+		elif self.select==2:
+			img2show = pcv.heat_map(self.depth.reshape((240,320)))
 			img2show = cv2.putText(img2show, 'dpth', (0,15), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0,0,0), 2)
 			img2show = cv2.putText(img2show, 'dpth', (0,15), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,255), 1)
+		elif self.select==3:
+			img2show = pcv.heat_map(self.ambient.reshape((240,320)))
+			img2show = cv2.putText(img2show, 'amb', (0,15), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0,0,0), 2)
+			img2show = cv2.putText(img2show, 'amb', (0,15), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,255), 1)
 		return img2show
 
 	def main(self):
@@ -99,12 +114,11 @@ class gui(interface):
 			self.pc = self.depth_processor.process(self.depth)
 			pcv.pcshow(self.pc)
 		if key_pressed == ord(','):
-			self.select = 1 if self.select==0 else self.select-1
+			self.select = 3 if self.select==0 else self.select-1
 		if key_pressed == ord('.'):
-			self.select = 0 if self.select==1 else self.select+1
+			self.select = 0 if self.select==3 else self.select+1
 
 
 if __name__=='__main__':
 	a = gui()
 	a.loop()
-	a.cap.release()
