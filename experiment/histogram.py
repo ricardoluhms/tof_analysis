@@ -28,7 +28,7 @@ class Main_Histogram():
         #### Check if one value most of the counts
         max_cod=new_count.max()/new_count.sum()
         print("max_cod= ", max_cod)
-        if max_cod>0.8:
+        if max_cod>0.6:
             b=np.where(self.count==new_count.max())
             new_count2=np.delete(new_count,b)
             new_bins2=np.delete(new_bins,b)

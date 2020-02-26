@@ -1,8 +1,7 @@
 import sys
 ### Modify sys path if the tof project folder is not in PATH
-#print(sys.path)
+print(sys.path)
 sys.path.append("D:\\tof")
-
 import numpy as np
 import cv2
 import pandas as pd
@@ -11,6 +10,7 @@ import os
 #### Plot Libraries
 import matplotlib.pyplot as plt
 from matplotlib import patches as ptc
+import matplotlib.cm as cm
 #### Customized Libraries - Luhm
 from bin_opener.input_data import Input_data, Mfolder
 from experiment.exp_data import Exp_data
@@ -20,6 +20,7 @@ from viewer.show_n_crop import Feature_show, Crop
 def main():
     ### File path to load data of all experiment setup data loading
     #file_path="D:/tof/Experimento_TOF_Texas.xlsx
+    #from IPython import embed;embed()   
     file_path="D:/tof/Experimento_TOF_TexasAlcance.xlsx"
 
 
@@ -52,7 +53,8 @@ def main():
     #from IPython import embed; embed()
     #crop_activate_list=[0,1,4,5,8,9,12,15,18,21]
     #da.select_crop_folders(crop_activate_list,crop_object_num=5)
-    output="d:/tof/tof_exp_multi_alcance.xlsx"
+    output="d:/tof/tof_exp_multi_alcance_art.xlsx"
+    #output="d:/tof/tof_exp_multi_alcance.xlsx"
     #da.save_crop_coord(excel_filename=output)
 
     #################################################################
@@ -78,17 +80,85 @@ def main():
     ### Run analysis
     #################################################################
     #amp_filter_list=[0,3,5,10]
-    amp_filter_list=[10]
-    for amp_f in amp_filter_list:
+    #amp_filter_list=[0]
+    amp_f=3
+    da.run_data_analysis(folders_numb=len(da.mfld.folder_path_list),
+                        frame_limit=30,
+                        crop_label_list=crop_list,
+                        mode="object",img_show=False,amp_filt_val=amp_f)
+    da.final_count_pack
+    df=pd.DataFrame(da.final_count_pack,
+                    columns=["crop_label","aten","exp_depth",
+                                "err_depth_mean","err_depth_std",
+                                "amp_data_mean","amp_data_avg",
+                                "depth_data_mean","depth_data_avg",
+                                "filter_count","amp_ravel","error_ravel","depth_ravel","digital_f"])
 
-        da.run_data_analysis(folders_numb=len(da.mfld.folder_path_list),
-                            frame_limit=5,
-                            crop_label_list=crop_list,
-                            mode="object",img_show=False,amp_filt_val=amp_f)
-        for aten_filt in da.aten_list:
-            for label_filt in crop_list:
-                da.amp_depth_curve(da.final_count_pack,aten_filt,label_filt,mode="Amp",plot_save=True)
-                da.amp_depth_curve(da.final_count_pack,aten_filt,label_filt,mode="Error",plot_save=True)
+
+    df.to_excel("d:/tof/outputs2/file_final.xlsx")
+    crop_labels=list(df['crop_label'].drop_duplicates().reset_index(drop=True))
+    exp_depths=list(df['exp_depth'].drop_duplicates().reset_index(drop=True))
+    digitalfitls=list(df['digital_f'].drop_duplicates().reset_index(drop=True))
+    atenfilts=list(df['aten'].drop_duplicates().reset_index(drop=True))
+    colors = cm.rainbow(np.linspace(0, 1, len(crop_labels)))          
+
+    from IPython import embed;embed()   
+    count=24
+    for atnum, atenf in enumerate(atenfilts):
+        for di_num, dig_f in enumerate(digitalfitls):
+            fig=plt.figure()
+            #fig, axs = plt.subplots(len(atenfilts), len(digitalfitls))
+            fig.set_size_inches(25, 14.18)
+
+            ax1=fig.add_subplot(111,aspect='auto')
+            #axs[atnum, di_num].set_title(atenf+" + "+dig_f)
+            ax1.set_title("Depth vs Depth Error: "+ atenf+" + "+dig_f, fontsize=22)
+            ax1.set_xlabel('Experiment Depth [mm]', fontsize=20)
+            ax1.set_ylabel('Depth Error[mm]', fontsize=20)
+            ax1.set_ylim(0, 500.0)
+            start, end = ax1.get_ylim()
+            ax1.yaxis.set_ticks(np.arange(start, end, 25))
+
+            ax1.set_xlim(0, 13000)
+            start, end = ax1.get_xlim()
+            ax1.xaxis.set_ticks(np.arange(start, end, 1000))
+            ax1.tick_params(axis='both', which='major', labelsize=20)
+
+            
+            for num, cplb in enumerate(crop_labels):
+                label=df['crop_label']==cplb
+                depth=df['exp_depth']!=7501
+                filt=df['digital_f']==dig_f
+                aten=df['aten']==atenf
+                and_check=df[((aten & label)&filt)&depth]
+                x=list(np.array(and_check['exp_depth'])+150*num)
+                y=list(and_check['err_depth_mean']*1000)
+                ym=list(and_check['err_depth_std']*1000)
+
+                ax1.scatter(x,y,c=colors[num])
+                ax1.errorbar(x, y, yerr=ym, uplims=False, lolims=True, label=cplb)
+
+            ax1.legend(fontsize=20)
+            plt.grid(True)
+            fig_name=str(count)+"_Depth_vs_Depth_Error_"+ atenf+"_"+dig_f+".png"
+            file_name="D:/tof/outputs2/Art/"+fig_name
+            plt.savefig(file_name, dpi=300,format='png')
+            count+=1
+    #fig.show()
+
+    """pack=[crop_label,self.exp_aten,self.exp_depth,
+             round(abs(error_depth_array).mean(),3), round(abs(error_depth_array).std(),3),
+             round(amp_data.mean(),1), round(amp_data.std(),1),
+             round(depth_data.mean(),3),round(depth_data.std(),3),
+             m1.sum(),
+             amp_data.ravel(),error_depth_array.ravel(),depth_data.ravel(),
+             dif_filt]"""
+
+
+        #for aten_filt in da.aten_list:
+        #    for label_filt in crop_list:
+        #        #da.amp_depth_curve(da.final_count_pack,aten_filt,label_filt,mode="Amp",plot_save=True)
+        #        da.amp_depth_curve(da.final_count_pack,aten_filt,label_filt,mode="Error",plot_save=True)
     #from IPython import embed;embed()
     #################################################################
     ### Plot analysis
@@ -97,25 +167,6 @@ def main():
     #df.to_excel("d:/tof/coord_patches_mean_std_"+str(pixels)+".xlsx")
     #from IPython import embed;embed()
 
-    #################################################################
-    ### Load Crop
-    #################################################################
-    # depth_list=["1013","3009","4834"]
-    # aten_list=["Sem filtro","Pelicula 1","Pelicula 2",
-    #            "Pelicula 3","Pelicula 4","Pelicula 5"]
-    #aten_list=["Sem filtro","Fume 1","Fume 2",
-    #           "Pelicula 1","Pelicula 2","Pelicula 3","Pelicula 4","Pelicula 5"]
-    
-    # for depth in depth_list:
-    #     lst=[depth]
-    #     for aten in aten_list:
-    #         lst2=[aten]
-    #         aten_pack=Data_analysis.filter_by_atenuator(self.final_count_pack,aten_list=lst2)
-    #         depth_pack=Data_analysis.filter_by_depth(aten_pack,depth_list=lst)
-    #         Data_analysis.error_plot(depth_pack)
-   
-    #columns=['atenuador','exp_depth','amp_mean','amp_std','error_mean','error_std'],
-    #filename_export="d:/tof/output.xlsx"
 
 class Data_analysis():
     def __init__(self,all_exp_folder,exp_setup_filepath,frame_limit=30):
@@ -292,9 +343,9 @@ class Data_analysis():
 
     def get_crop_coord(self,crop_label="std_label-0",aten_num=1):
         if aten_num==0:
-            aten_lb="Sem Filtro"
+            aten_lb="No_Optical_Filter"
         elif aten_num==1:
-            aten_lb="Pelicula 1"
+            aten_lb="F1_Optical_Filter"
         depth=self.df_coord['depth']==self.exp_depth
         label=self.df_coord['label']==crop_label
         aten=self.df_coord['aten']==aten_lb
@@ -311,9 +362,9 @@ class Data_analysis():
 
     def get_patch_coord(self,crop_label="std_label-0",depth="",aten_num=1):
         if aten_num==0:
-            aten_lb="Sem Filtro"
+            aten_lb="No_Optical_Filter"
         elif aten_num==1:
-            aten_lb="Pelicula 1"
+            aten_lb="F1_Optical_Filter"
         
         label=self.df_patch_coord['full_label']==crop_label
         aten=self.df_patch_coord['aten']==aten_lb
@@ -340,90 +391,103 @@ class Data_analysis():
         self.aten_list=[]
         self.depth_list=[]
         self.final_count_pack=[]
+        self.digital_filter=["No_Comp_Vision_Filter",
+                             "Threshold_Otsu",
+                             "Temporal_median_filter",
+                             "Spatial_Median_filter",
+                             "Spatial_Bilateral_filter"]
         for folder_count in range(folders_numb):
             self.single_folder(folder_count)
             ################
-            amp_img, self.bin_mask=self.fs.dual_otsu(self.grouped_array[0][0],single_data=True)
-            if img_show:
-                amp_img=((amp_img/amp_img.max())*255).astype("uint8")
-                amp_img=cv2.cvtColor(amp_img,cv2.COLOR_GRAY2BGR)
-                img_name=("ExpA-Aten: "+str(self.exp_aten)+" Depth: "+str(self.exp_depth))
-                cv2.namedWindow(img_name,cv2.WINDOW_KEEPRATIO)
-            pack1=[]
+            
+            for dif_filt in self.digital_filter:
+                if dif_filt=="Threshold_Otsu":
+                    amp_img, self.bin_mask=self.fs.dual_otsu(self.grouped_array[0][0],single_data=True)
+                    mod_grouped_array=self.grouped_array
+                elif dif_filt=="Spatial_Median_filter":
+                    mod_grouped_array, _=self.fs.multi_filter(self.grouped_array,
+                                                                  feature_num=2,mode="Spatial_Median_filter")
+                elif dif_filt=="Spatial_Bilateral_filter":
+                    mod_grouped_array, _=self.fs.multi_filter(self.grouped_array,
+                                                                  feature_num=2,mode="Spatial_Bilateral_filter")
+                elif dif_filt=="Temporal_median_filter":
+                    t_amp, _=self.fs.temporal(self.grouped_array,frame_hist=10,feature_num=0)
+                    t_depth, _=self.fs.temporal(self.grouped_array,frame_hist=10,feature_num=2)
+                    #from IPython import embed; embed()
+                    #pass
+                elif dif_filt=="No_Comp_Vision_Filter":
+                    mod_grouped_array=self.grouped_array
+                    self.bin_mask=np.ones(mod_grouped_array[0,0,:,:].shape,dtype="bool")
 
-            if self.exp_aten not in self.aten_list:
-                self.aten_list.append(self.exp_aten)
-
-            if self.exp_depth not in self.depth_list:
-                self.depth_list.append(self.exp_depth)
-
-            for crop_label in crop_label_list:
-                #from IPython import embed;embed()
-                #print(self.df_patch_coord)
-                if self.exp_aten=="Sem Filtro":
-                    aten_num=0
-                else:
-                    aten_num=1
-                    
-                if mode=="object":
-                    roi_coord=self.get_crop_coord(crop_label=crop_label,aten_num=aten_num)
-
-
-                elif mode=="patch":
-                    roi_coord=self.get_patch_coord(crop_label=crop_label,depth=self.exp_depth,aten_num=aten_num)
-                
-                if roi_coord!=0:
-                    
-                    afv=self.amp_filt_val
-                    error_depth_array,amp_data,depth_data=self.single_object_analysis(
-                        roi_coord,crop_label,low_amp_filter=True,amp_filt_val=afv
-                        )
-                    m1=amp_data>afv
-                    if m1.sum()!=0:                    
-                        error_depth_array=error_depth_array[m1]
-                        amp_data=amp_data[m1]
-                        depth_data=depth_data[m1]
-                        #from IPython import embed;embed()
-
-                        pack=[crop_label,self.exp_aten,self.exp_depth,
-                          round(abs(error_depth_array).mean(),3), round(abs(error_depth_array).std(),3),
-                          round(amp_data.mean(),1), round(amp_data.std(),1),
-                          round(depth_data.mean(),3),round(depth_data.std(),3),
-                          m1.sum(),amp_data.ravel(),error_depth_array.ravel(),depth_data.ravel()]
-                        self.final_count_pack.append(pack)
-                    pt1=(roi_coord[0],roi_coord[1])
-                    pt2=(roi_coord[2],roi_coord[3])
-                    pt3=(int((roi_coord[2]+roi_coord[0])/2),int((roi_coord[3]+roi_coord[1])/2))
-                    if img_show:
-                        if abs(error_depth_array.mean())>0.2:
-                            clr=(0,0,255)
-                        elif (abs(error_depth_array.mean())<=0.2 and abs(error_depth_array.mean())>0.08):
-                            clr=(80,127,255)
-                        elif (abs(error_depth_array.mean())<=0.08 and abs(error_depth_array.mean())>0.05):
-                            clr=(0,215,255)
+                for crop_label in crop_label_list:
+                    roi_coord=self._roi_coord_mode(mode=mode,crop_label=crop_label)
+                    if roi_coord!=0:
+                        afv=self.amp_filt_val
+                        if dif_filt=="Temporal_median_filter":
+                            error_depth_array,amp_data,depth_data=self.temporal_analysis(t_amp,t_depth,roi_coord,crop_label,
+                                                                                       low_amp_filter=True,amp_filt_val=afv)
+                        elif dif_filt=="No_Comp_Vision_Filter":
+                            error_depth_array,amp_data,depth_data=self.single_object_analysis(mod_grouped_array,
+                                                                                            roi_coord,crop_label,
+                                                                                            low_amp_filter=True,amp_filt_val=0)
                         else:
-                            clr=(0,255,0)
-                        cv2.rectangle(amp_img,pt1=pt1,pt2=pt2,color=clr,thickness=1)
-                    if (mode=="object" and img_show):
-                        cv2.putText(amp_img,crop_label,pt3,cv2.FONT_HERSHEY_SIMPLEX, 0.5,color=clr)
-                    
-            if img_show:
-                amp_img=cv2.resize(amp_img,dsize=None,fx=5,fy=5)
-                cv2.imshow(img_name,amp_img)
-                if img_save:
-                    filename=("Exp-Aten_"+str(self.exp_aten)+"_Depth_"+str(self.exp_depth)+"_PixelPatch_"+str(self.pixel))
-                    filename="D:/tof/outputs/img"+filename+".jpg"
-                    cv2.imwrite(filename,amp_img)
-                cv2.waitKey()
-        if img_show:
-            cv2.destroyAllWindows()
+                            error_depth_array,amp_data,depth_data=self.single_object_analysis(mod_grouped_array,
+                                                                                            roi_coord,crop_label,
+                                                                                            low_amp_filter=True,amp_filt_val=afv)
+                        m1=amp_data>afv
+                        if m1.sum()!=0:                    
+                            error_depth_array=error_depth_array[m1]
+                            amp_data=amp_data[m1];      depth_data=depth_data[m1]
 
-    def single_object_analysis(self,roi_coord,crop_label,low_amp_filter=False,amp_filt_val=19):
+                            pack=[crop_label,self.exp_aten,self.exp_depth,
+                            round(abs(error_depth_array).mean(),3), round(abs(error_depth_array).std(),3),
+                            round(amp_data.mean(),1), round(amp_data.std(),1),
+                            round(depth_data.mean(),3),round(depth_data.std(),3),
+                            m1.sum(),amp_data.ravel(),error_depth_array.ravel(),depth_data.ravel(),dif_filt]
+                            self.final_count_pack.append(pack)
+    
+    def temporal_analysis(self,t_amp,t_depth,
+                          roi_coord,crop_label,
+                          low_amp_filter=True,amp_filt_val=3):
+
         if low_amp_filter:
-            amp_data_mask=self.grouped_array[0,0,:,:]>amp_filt_val   
-            masked_array=self.fs.apply_mask(self.grouped_array,amp_data_mask)
+            amp_data_mask=t_amp[0,:,:]>amp_filt_val  
+            masked_array_amp=self.fs.apply_mask_temporal(t_amp,amp_data_mask)
+            masked_array_depth=self.fs.apply_mask_temporal(t_depth,amp_data_mask)
+            
+            if amp_data_mask.sum()==0:
+                masked_array_amp=t_amp
+                masked_array_depth=t_depth
+
         else:
-            masked_array=self.grouped_array
+            masked_array_amp=t_amp
+            masked_array_depth=t_depth
+
+        cropped_array_amp=self.cp.temporal_crop(masked_array_amp,roi_coord)
+        cropped_array_depth=self.cp.temporal_crop(masked_array_depth,roi_coord)
+        cropped_mask=self.cp.single_feature_crop(self.bin_mask,roi_coord)
+
+        if cropped_mask.sum()==0:
+            cropped_mask_array_amp=cropped_array_amp
+            cropped_mask_array_depth=cropped_array_depth
+        else:   
+            cropped_mask_array_amp=self.fs.apply_mask_temporal(cropped_array_amp,cropped_mask)
+            cropped_mask_array_depth=self.fs.apply_mask_temporal(cropped_array_depth,cropped_mask)
+
+        depth_max=7496
+        error_depth_array=self.fs.temporal_depth_check(cropped_mask_array_depth, self.exp_depth,depth_max=depth_max)
+        #### Check Effects of error mask over depth array and amp_data
+        amp_data=cropped_mask_array_amp
+        depth_data=cropped_mask_array_depth
+
+        return error_depth_array,amp_data,depth_data
+
+    def single_object_analysis(self,grouped_array,roi_coord,crop_label,low_amp_filter=False,amp_filt_val=3):
+        if low_amp_filter:
+            amp_data_mask=grouped_array[0,0,:,:]>amp_filt_val   
+            masked_array=self.fs.apply_mask(grouped_array,amp_data_mask)
+        else:
+            masked_array=grouped_array
         cropped_array=self.cp.multi_feature_crop(masked_array,roi_coord)
         cropped_mask=self.cp.single_feature_crop(self.bin_mask,roi_coord)
         if cropped_mask.sum()==0:
@@ -436,16 +500,15 @@ class Data_analysis():
         #### Check Effects of error mask over depth array and amp_data
         amp_data=cropped_masked_array[:,0,:,:]
         depth_data=cropped_masked_array[:,2,:,:]
-        if (self.exp_depth>depth_max+100 and self.exp_depth>depth_max-100):
+        if (self.exp_depth<(depth_max+100) and self.exp_depth>(depth_max-100)):
             phase_mask_low=cropped_masked_array[0,4,:,:]<(70)
             phase_mask_remm=np.logical_not(phase_mask_low)
             #from IPython import embed;embed()
             depth_data_low=self.fs.apply_mask(cropped_masked_array,phase_mask_low)[:,4,:,:]+7.496
             depth_data_high=self.fs.apply_mask(cropped_masked_array,phase_mask_remm)[:,4,:,:]
             depth_data=depth_data_low+depth_data_high
-        elif self.exp_depth>depth_max>depth_max:
+        elif self.exp_depth>depth_max:
             depth_data=depth_data+7.496
-
         return error_depth_array,amp_data,depth_data    
 
     def _apply_histogram(self,amp_data,error_depth_data,plot=False):
@@ -553,83 +616,6 @@ class Data_analysis():
         #ax.set_xlim((0, 1000))
         #ax.set_ylim((-0.200, 0.200))
         plt.show()
-        
-    def plot_setup(self,x_axis_col_name='exp_depth',
-                        y_mean_column='amp_mean',
-                        y_std_column='amp_std',
-                        label='atenuador'):
-
-        self.dfr.set_x_axis(x_axis_col_name)
-        self.dfr.set_y_axis(y_mean_column,y_std_column)
-        self.dfr.set_label(label)
-    
-    @staticmethod
-    def filter_by_label(final_count_pack,label_list):
-        filtered_pack=[]
-        for experiment in final_count_pack:
-            data=np.array(experiment[0])
-            if len(data)!=0:
-                label=experiment[2]
-                if label in label_list:
-                    filtered_pack.append(experiment)
-        return filtered_pack
-
-    @staticmethod
-    def filter_by_depth(final_count_pack,depth_list):
-        filtered_pack=[]
-        for experiment in final_count_pack:
-            data=np.array(experiment[0])
-            if len(data)!=0:
-                exp_name=experiment[1]
-                depth=exp_name.split("Depth: ")[1]
-                depth=depth.split(" - ")[0]
-                if depth in depth_list:
-                    filtered_pack.append(experiment)
-        return filtered_pack
-        
-    @staticmethod
-    def filter_by_atenuator(final_count_pack,aten_list):
-        filtered_pack=[]
-        for experiment in final_count_pack:
-            data=np.array(experiment[0])
-            if len(data)!=0:
-                exp_name=experiment[1]
-                aten=exp_name.split("Aten: ")[1].split(" -")[0]
-                if aten in aten_list:
-                    filtered_pack.append(experiment)
-        return filtered_pack
-
-    def combine_otsu(self,feature_num1=0,feature_num2=2,frame=0):
-        img1=self.grouped_array[frame][feature_num1]
-        #img2=self.grouped_array[frame][feature_num2]
-
-        u1a,u2a,l1a,l2a=self.fs.four_ostu(self.grouped_array,frame_num=0,feature_num=feature_num1)
-        u1b,u2b,l1b,l2b=self.fs.four_ostu(self.grouped_array,frame_num=0,feature_num=feature_num2)
-        a=[u1a,u2a,l1a,l2a]
-        b=[u1b,u2b,l1b,l2b]
-
-        c=["hest_a","high_a","low_a","lest_a"]
-        d=["hest_d","high_d","low_d","lest_d"]
-        count=0
-        for num_a,elem_a in enumerate(a):
-            for num_b,elem_b in enumerate(b):
-                name1="a"+str(count)+"-"+c[num_a]+"-"+d[num_b]
-                #name2="d-"+c[num_a]+"_"+d[num_b]+"
-                cv2.namedWindow(name1,cv2.WND_PROP_AUTOSIZE)
-                #cv2.namedWindow(name2,cv2.WND_PROP_AUTOSIZE)
-                mask=np.logical_and(elem_a,elem_b)
-                img1A=img1*mask
-                #img2A=img2*mask
-
-                img1A=((img1A/img1A.max())*255).astype("uint8")
-                #img2A=((img2A/img2A.max())*255).astype("uint8")
-
-                #from IPython import embed; embed()
-                cv2.imshow(name1,img1A)
-                count=count+1
-                #cv2.imshow(name1,img2A)
-        cv2.waitKey()
-        cv2.destroyAllWindows()
     
     def amp_depth_curve(self, final_count_pack,aten_filt,label_filt,mode="Amp",plot_save=False):
         import matplotlib.cm as cm
@@ -661,8 +647,10 @@ class Data_analysis():
 
                     ax1.scatter(center[0],center[1],c=color1,label=name+"_mean_center")
                     #ax1.scatter(depth_all,amp_all,c=color1,marker="x",label=name+"_scatter")
-                    ellipse1 = ptc.Ellipse(center, width, height, color=color1, linewidth=2, fill=True, zorder=2,alpha=0.65)
-                    ax1.add_patch(ellipse1)
+                    plt.errorbar(center[0], center[1], yerr=height, uplims=True, lolims=True,
+                        label=name+"_mean_center")
+                    #ellipse1 = ptc.Ellipse(center, width, height, color=color1, linewidth=2, fill=True, zorder=2,alpha=0.65)
+                    #ax1.add_patch(ellipse1)
                     
         if count!=0:
             if mode=="Amp":
@@ -694,7 +682,26 @@ class Data_analysis():
                 plt.savefig(filepath, dpi=300,format='png')
             
             #plt.show()
-        
+
+    def _roi_coord_mode(self,mode,crop_label):
+
+        if self.exp_aten=="No_Optical_Filter":
+            aten_num=0
+        else:
+            aten_num=1
+
+        if mode=="object":
+            roi_coord=self.get_crop_coord(crop_label=crop_label,aten_num=aten_num)
+        elif mode=="patch":
+            roi_coord=self.get_patch_coord(crop_label=crop_label,depth=self.exp_depth,aten_num=aten_num)
+        return roi_coord     
+
+    def _depth_aten_update(self):
+        if self.exp_aten not in self.aten_list:
+            self.aten_list.append(self.exp_aten)
+
+        if self.exp_depth not in self.depth_list:
+            self.depth_list.append(self.exp_depth)
 
 class Dataframe_results():
     def __init__(self,dataframe):

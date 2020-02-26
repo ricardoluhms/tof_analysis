@@ -4,6 +4,9 @@ import numpy as np
 #### Customized Libraries  - Vinicius
 from filters.utils import filter
 from filters.utils import edge_filter as edf
+from filters.utils import median_filter as smdf
+from filters.utils import bilateral_filter as sblf
+from filters.utils import temporal_median_filter as tmf
 
 class Feature_show():
 	def __init__(self):
@@ -129,7 +132,54 @@ class Feature_show():
 		final_mask=np.logical_or(mask2,mask5)
 		final_img=img*final_mask
 
-		return final_img, final_mask
+		return final_img, mask2 #final_mask
+
+	@staticmethod
+	def multi_filter(grouped_array,feature_num=0,mode="Spatial_Median_filter"):
+		fs=Feature_show()
+		shapes=grouped_array.shape
+		for frame in range(shapes[0]):
+			frame_img=grouped_array[frame][feature_num]
+		### check exploding and normalize input
+			shape = frame_img.shape
+			if mode=="Spatial_Median_filter":
+				f=smdf(frame_img.shape[0],frame_img.shape[1])	
+			elif mode=="Spatial_Bilateral_filter":
+				f=sblf(frame_img.shape[0],frame_img.shape[1],kernel_size=15,std_color=15,std_space=15)	
+			grouped_array[frame][feature_num]=f.apply(frame_img.reshape((-1,1))).reshape(shape)
+
+		final_mask=np.ones(shape,dtype="bool")
+
+		return grouped_array, final_mask
+
+	@staticmethod
+	def temporal(grouped_array,frame_hist=10,feature_num=2):
+		# grouped_array.shape = [frame,features,height,width]
+		#feature_num==2  ---- Equals the depth feature in the grouped array
+		#feature_num==0  ---- Equals the amplitude feature in the grouped array 
+		fs=Feature_show()
+		shape=grouped_array.shape
+
+		if len(shape)==4:
+			if shape[0]<frame_hist:
+				frame_hist=shape[0]
+			f=tmf(frame_hist)
+
+			for fram in range(shape[0]):
+				frame_img=grouped_array[fram,feature_num,:,:]
+				shap=frame_img.shape
+
+				temp_frame=f.apply(frame_img.reshape((-1,1))).reshape(shap)
+				if fram==0:
+					final_frames=np.array([temp_frame])
+					#from IPython import embed; embed()
+				else:
+					final_frames=np.vstack((final_frames,np.array([temp_frame])))
+			final_mask=np.ones(shape,dtype="bool")
+		
+		return final_frames, final_mask
+
+
 
 	@staticmethod
 	#under development
@@ -245,6 +295,13 @@ class Feature_show():
 			error_depth_array=any_grouped_array[:,2,:,:]-exp_depth/1000
 		return error_depth_array
 
+	def temporal_depth_check(self,temporal_depth_array,exp_depth,depth_max=7500):
+		if exp_depth>depth_max:
+			error_depth_array=(temporal_depth_array[:,:,:]+depth_max/1000)-exp_depth/1000
+		else:	
+			error_depth_array=temporal_depth_array[:,:,:]-exp_depth/1000
+		return error_depth_array
+
 	def apply_mask(self,any_grouped_array,mask,mask_type="binary"):
 		frames,features,_,_=any_grouped_array.shape
 		masked_array=any_grouped_array.copy()
@@ -253,6 +310,20 @@ class Feature_show():
 		for frame in range(frames):
 			for feature in range(features):
 				masked_array[frame,feature:,:]=any_grouped_array[frame,feature:,:]*mask
+		return masked_array
+
+	def apply_mask_temporal(self,any_grouped_array,mask,mask_type="binary"):
+		frames,_,_=any_grouped_array.shape
+		masked_array=any_grouped_array.copy()
+		if mask_type!="binary":
+			mask=(mask==255).reshape((240,320))
+
+		if len(mask.shape)==4:
+			if mask.sum()==mask.shape[0]*mask.shape[1]*mask.shape[2]*mask.shape[3]:
+				mask=np.ones(any_grouped_array.shape[1:]).astype("bool")
+				#from IPython import embed; embed()
+		for frame in range(frames):
+			masked_array[frame,:,:]=any_grouped_array[frame,:,:]*mask
 		return masked_array
 
 class Crop(Feature_show):
@@ -336,6 +407,10 @@ class Crop(Feature_show):
 
 	def multi_feature_crop(self,grouped_array,roi_coord):
 		group_crop=grouped_array[:,:,roi_coord[1]:roi_coord[3],roi_coord[0]:roi_coord[2]]
+		return group_crop
+
+	def temporal_crop(self,grouped_array,roi_coord):
+		group_crop=grouped_array[:,roi_coord[1]:roi_coord[3],roi_coord[0]:roi_coord[2]]
 		return group_crop
 
 	def single_feature_crop(self,simple_array,roi_coord):
