@@ -6,7 +6,7 @@ from interface.utils import *
 import cv2, numpy as np
 
 class gui(interface):
-	def __init__(self):
+	def __init__(self,exp_dir):
 		interface.__init__(self)
 		self.x, self.y, self.z, self.amplitude = None, None, None, None
 		self.pc = np.zeros((240*320,3), dtype='float32')
@@ -14,10 +14,8 @@ class gui(interface):
 		self.font_size=1
 		self.phase_processor = phase2depth(240, 320,f1=16e6,f2=24e6,focal_length=3.33e-3,pixel_size=15e-6,dealiased_mask=2, filter=None)
 		self.select = 0
-
-		dist = '4340'
 		# self.exp_dir = '/home/vinicius/tof/texas/record/04022020/exp1/%s/'%dist
-		self.exp_dir = '/home/vinicius/tof/texas/record/05022020/exp4/'
+		self.exp_dir = exp_dir #'/home/vinicius/tof/texas/record/05022020/exp4/'
 		self.phase_reader = reader(self.exp_dir+'phase.out')
 		self.amplitude_reader = reader(self.exp_dir+'amplitude.out')
 		self.ambient_reader = reader(self.exp_dir+'ambient.out')
