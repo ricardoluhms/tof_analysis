@@ -42,14 +42,16 @@ if __name__=='__main__':
 	phase_hdr = hdr_merger(240, 320, 'uint16', norm=False, max=255, norm_dtype='uint8')
 	amplitude_hdr = hdr_merger(240, 320, 'uint16', norm=True, max=2**12-1, norm_dtype='uint16')
 	phase_processor = phase2point_cloud(240,320,f1=16e6,f2=24e6,focal_length=3.33e-3,pixel_size=15e-6,dealiased_mask=3, filter=median_filter(240,320,kernel_size=7))
-
-	exp_dir = '10022020/exp4/illum/'
+	# '''
+	dist = '16987'
+	# exp_dir = '10022020/exp4/no_illum/%s/'%dist
+	exp_dir = '10022020/exp4/illum/%s/'%dist
 	check_dir(exp_dir)
 	phase_writer = writer(exp_dir+'phase.out',dtype='uint16')
 	amplitude_writer = writer(exp_dir+'amplitude.out',dtype='uint16')
 	ambient_writer = writer(exp_dir+'ambient.out',dtype='uint8')
 	flags_writer = writer(exp_dir+'flags.out',dtype='uint8')
-
+	# '''
 	count=0
 	while 1:
 		ret, [phase, amplitude, ambient, flags] = cap.read()
@@ -65,6 +67,10 @@ if __name__=='__main__':
 		ambient_writer.write(ambient); flags_writer.write(flags)
 		# '''
 
+		# phase = phase_hdr.merge(phase, flags)
+		# amplitude = amplitude_hdr.merge(amplitude, flags)
+
+		# cpcv.pcshow(pc)
 		pcv.imshow('phase', phase, heat_map=True)
 		pcv.imshow('', amplitude, heat_map=True)
 		key_pressed = cv2.waitKey(1) & 0xff
