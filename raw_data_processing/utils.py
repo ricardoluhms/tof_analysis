@@ -1,12 +1,18 @@
 import numpy as np
+'''
+Review if it should be put into ONE class instead!
+'''
 class processor():
-	def __init__(self, height, width, f1, f2, focal_length, pixel_size):
+	def __init__(self, height, width, f1, f2, focal_length, pixel_size, dealiased_mask):
 		self.height = height
 		self.width = width
+		self.dealiased_mask = dealiased_mask
 
 		self.c = 299792458
 		self.freq = None
 		self.R = None
+		self.ma = None
+		self.mb = None
 		self.set_parameters(f1, f2)
 
 		self.x_alpha = None
@@ -20,35 +26,63 @@ class processor():
 		sensor_y = (sensor_y * self.pixel_size) + self.pixel_size / 2 - (self.pixel_size * self.height) / 2
 		self.x_alpha = np.arctan(sensor_x/self.focal_length).reshape((-1,1))
 		self.y_alpha = np.arctan(sensor_y/self.focal_length).reshape((-1,1))
+		self.beta = np.arctan(np.sqrt(np.square(sensor_x)+np.square(sensor_y))/self.focal_length).reshape((-1,1))
 
 	def set_parameters(self, f1, f2):
 		self.freq = np.gcd(int(f1),int(f2))
 		self.R = self.c/(2*self.freq)
+		self.ma = f1/self.freq
+		self.mb = f2/self.freq
 
 	def process(self):
 		pass
 
-
 class phase2depth(processor):
-	def __init__(self, height, width,f1=4e7,f2=6e7,focal_length=3.33e-3,pixel_size=15e-6):
-		processor.__init__(self, height, width,f1=f1,f2=f2,focal_length=focal_length,pixel_size=pixel_size)
+	def __init__(self, height, width,f1=4e7,f2=6e7,focal_length=3.33e-3,pixel_size=15e-6,dealiased_mask=2, filter=None):
+		processor.__init__(self, height, width,f1,f2,focal_length,pixel_size,dealiased_mask)
+		self.filter = filter
+
+	def phase2distance(self, phase):
+		phase[phase>2**12-1] = 2**12-1
+		phase = phase.reshape((-1,1))
+		distance = (phase*self.R*2**(5-self.dealiased_mask))/(self.ma*self.mb*2**12)
+		return distance
 
 	def process(self, phase):
-		phase = phase.reshape((-1,1))
-		distance = phase*self.R/(2*np.pi)/1000
-		depth = (np.cos(self.y_alpha)*distance)*np.cos(self.x_alpha)
-		return depth
+		distance = self.phase2distance(phase)
+		depth = distance*np.cos(self.beta)
+		if type(self.filter) != type(None):
+			depth = self.filter.apply(depth)
+		return depth.astype('float32')
 
+class depth2point_cloud(processor):
+	def __init__(self, height, width,f1=4e7,f2=6e7,focal_length=3.33e-3,pixel_size=15e-6,dealiased_mask=2, filter=None):
+		processor.__init__(self, height, width,f1,f2,focal_length,pixel_size,dealiased_mask)
+		self.filter = filter
 
-class phase2point_cloud(processor):
-	def __init__(self, height, width,f1=4e7,f2=6e7,focal_length=3.33e-3,pixel_size=15e-6):
-		processor.__init__(self, height, width,f1=f1,f2=f2,focal_length=focal_length,pixel_size=pixel_size)
-
-	def process(self, phase):
-		phase = phase.reshape((-1,1))
-		distance = phase*self.R/(2*np.pi)/1000
-		x = distance*np.sin(self.x_alpha)
-		y = distance*np.sin(self.y_alpha)
-		z = (np.cos(self.y_alpha)*distance)*np.cos(self.x_alpha)
+	def depth2point_cloud(self, z):
+		z = z.reshape((-1,1))
+		x = z*np.tan(self.x_alpha)
+		y = z*np.tan(self.y_alpha)
 		point_cloud = np.hstack([x,y,z])
-		return point_cloud
+		return point_cloud.astype('float32')
+
+	def process(self, z):
+		if type(self.filter) != type(None):
+			z = self.filter.apply(z)
+		point_cloud = self.depth2point_cloud(z)
+		return point_cloud.astype('float32')
+
+
+class phase2point_cloud(phase2depth,depth2point_cloud):
+	def __init__(self, height, width,f1=4e7,f2=6e7,focal_length=3.33e-3,pixel_size=15e-6,dealiased_mask=2, filter=None):
+		phase2depth.__init__(self, height, width,f1,f2,focal_length,pixel_size,dealiased_mask)
+		self.filter = filter
+
+	def process(self, phase):
+		distance = self.phase2distance(phase)
+		z = distance*np.cos(self.beta)
+		if type(self.filter) != type(None):
+			z = self.filter.apply(z)
+		point_cloud = self.depth2point_cloud(z)
+		return point_cloud.astype('float32')

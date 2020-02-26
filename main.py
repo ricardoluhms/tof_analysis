@@ -32,9 +32,15 @@ if __name__=='__main__':
 	# path = '/media/vinicius/048A82A468318E17/datasets/tof/Experimentos_atenuadores/Exp021/'
 	# path = '/media/vinicius/048A82A468318E17/datasets/tof/Experimentos_atenuadores/Exp026/'
 	# path='/media/vinicius/048A82A468318E17/datasets/tof/Exp_1_Pan_90_Tilt_0_ilum_y_reflex_n_dist_1512/'
+<<<<<<< HEAD
 	pc_opener = PointCloud_opener(path+'PointCloud.bin',240,320);pc_opener.open()
 	amp_opener = Amplitude_opener(path+'0Amplitude.bin',240,320);amp_opener.open()
 	phs_opener = Phase_opener(path+'Phase.bin',240,320);phs_opener.open()
+=======
+	pc_opener = PointCloud_opener(path+'PointCloud.bin',240,320).open()
+	amp_opener = Amplitude_opener(path+'Amplitude.bin',240,320).open()
+	phs_opener = Phase_opener(path+'Phase.bin',240,320).open()
+>>>>>>> 05c6d5e6f8ac52f84dfaef92176a6649a359cbaa
 
 
 	edfr = edge_filter(240,320)
