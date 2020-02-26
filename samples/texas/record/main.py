@@ -6,16 +6,6 @@ from hdr_merger.utils import *
 from read_write.utils import *
 import cv2, numpy as np
 
-class lens_callibrate():
-	def __init__(self,height,width,mapx,mapy):
-		self.height = height
-		self.width = width
-		self.mapx = mapx
-		self.mapy = mapy
-
-	def apply(self,frame):
-		return cv2.remap(frame.reshape((self.height,self.width)),self.mapx,self.mapy,cv2.INTER_LINEAR).reshape((-1,1))
-
 import time
 class FPS():
 	def __init__(self):
@@ -28,9 +18,6 @@ class FPS():
 
 
 if __name__=='__main__':
-	camera_matrix = np.load('camera_matrix.npz')
-	mapx = camera_matrix['mapx']; mapy = camera_matrix['mapy']
-
 	capture = raw_processed
 	# capture = depth
 	cap = capture()

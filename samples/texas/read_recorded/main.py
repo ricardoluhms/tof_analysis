@@ -23,9 +23,6 @@ class gui(interface):
 		self.ambient_reader = reader(self.exp_dir+'ambient.out')
 		self.flags_reader = reader(self.exp_dir+'flags.out')
 
-		self.camera_matrix = np.load('camera_matrix.npz')
-		self.mapx = self.camera_matrix['mapx']; self.mapy = self.camera_matrix['mapy']
-
 	def get_frame(self):
 	
 		ret, self.phase = self.phase_reader.read()
