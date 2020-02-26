@@ -4,7 +4,7 @@ project(DepthCapture)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/../../cmake/Modules)
 
 find_package(BaslerToF REQUIRED)
-find_package(OpenCV REQUIRED)
+#find_package(OpenCV REQUIRED)
 
 add_definitions(${BaslerToF_DEFINITIONS})
 include_directories(${BaslerToF_INCLUDE_DIRS})

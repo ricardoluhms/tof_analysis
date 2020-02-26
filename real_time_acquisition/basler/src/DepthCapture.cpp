@@ -1,9 +1,9 @@
 #include <ConsumerImplHelper/ToFCamera.h>
-#include <opencv2/opencv.hpp>
+// #include <opencv2/opencv.hpp>
 
 using namespace GenTLConsumerImplHelper;
 using namespace std;
-using namespace cv;
+// using namespace cv;
 
 
 void pointCloudMap(const PartInfo& pointCloud, float* xMap, float* yMap, float* zMap)
@@ -97,8 +97,8 @@ bool Sample::onImageGrabbed(GrabResult grabResult, BufferParts parts)
     }
     else
     {
-        try
-        {
+        // try
+        // {
             // -------  Create OpenCV images from grabbed buffer
 
             // First the intensity image...
@@ -140,14 +140,14 @@ bool Sample::onImageGrabbed(GrabResult grabResult, BufferParts parts)
             delete[] xMap;
             delete[] yMap;
             delete[] zMap;
-        }
-        catch (const Exception&  e)
-        {
-            cerr << e.what() << endl;
-        }
+        // }
+        // catch (const Exception&  e)
+        // {
+        //     cerr << e.what() << endl;
+        // }
     }
-    key = waitKey(1);
-    return 'q' != (char)key;
+    // key = waitKey(1);
+    // return 'q' != (char)key;
 }
 
 int main(int argc, char* argv[])
