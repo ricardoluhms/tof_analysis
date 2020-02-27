@@ -3,6 +3,7 @@ import sys
 sys.path.append("D:\\tof")
 import numpy as np
 import os
+import pandas as pd
 from matplotlib import pyplot as plt
 
 import matplotlib.patches as patches
@@ -10,7 +11,8 @@ import matplotlib.path as path
 from matplotlib import animation
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
-from samples.texas.read_recorded.main import gui
+#from samples.texas.read_recorded.main import gui
+from read_write.utils import reader
 
 class Main_folder_select():
     def __init__ (self,all_exp_folder):
@@ -24,7 +26,7 @@ class Main_folder_select():
                 if n_f_path not in self.folder_path_list:
                     self.folder_path_list.append(n_f_path)
 
-class Bin_file_reader():
+class Bin_texas_reader():
     def __init__(self,input_fld):
         #Texas Tof Model ['OPT8241']
         self.input_folder=input_fld
@@ -124,7 +126,8 @@ class Array_to_dataframe():
                               "Phase",  "PC_x", "PC_y", "PC_z","PC_i"]):
         self.titles = titles
     
-    def _create_coord(self,x,y,frames):
+    @staticmethod
+    def _create_coord(x,y,frames):
         ### p1
         i_pxl=(np.arange(0,x)).reshape(x,1)
         ### p2
@@ -178,6 +181,143 @@ class Array_to_dataframe():
         print("Conversion from Array into Frames")
         print("Assigned pixel coordinates and frames for each bin file ", array_table.shape)
         return array_table
+
+class Out_texas_reader(Array_to_dataframe,Main_folder_select):
+    def __init__(self,input_fld):
+        self.pathlist=[]
+        for file in os.listdir(input_fld):
+            path=os.path.join(input_fld,file)
+            self.pathlist.append(path)
+
+    def read(self):
+        file_counter=0
+        titles=["frame", "i_pxl", "j_pxl"]
+        
+        for file in self.pathlist:
+            pack_counter=0
+            pack = reader(file)
+            #from IPython import embed;embed()
+            _,fname=file.split("\\")
+            name,_=fname.split(".")
+            titles.append(name)
+            if file_counter==0:
+                frame_i_j_pack=self._create_coord(pack.width,pack.height,pack.frames_count)
+
+            for frame in range(pack.frames_count):
+                _, array = pack.read()
+                #array=array.reshape((pack.height,pack.width))
+                if pack_counter==0:
+                    array_pack=array 
+                else:
+                    array_pack=np.vstack((array_pack,array))
+                pack_counter+=1
+            if file_counter==0:
+                feature_pack=np.hstack((frame_i_j_pack,array_pack))
+            else:
+                #from IPython import embed;embed()
+                feature_pack=np.hstack((feature_pack,array_pack))
+            file_counter+=1
+        
+        df=pd.DataFrame(feature_pack,columns=titles)
+        return feature_pack,df
+    
+    @staticmethod
+    def depth2phase(freq1=16,freq2=24,ph_mask=2,exp_depth=1000,phase_corr=0):
+        dual_freq=np.gcd(freq1,freq2)
+        ma=freq1/dual_freq
+        mb=freq2/dual_freq
+        l_speed=299792458 #m/s
+        max_range=l_speed/(2e6*dual_freq)
+        calc_phase=np.round((ma*mb*(2**12))/(max_range*(2**(5-ph_mask)))*exp_depth,decimals=0)
+        return calc_phase
+
+    @staticmethod
+    def phase2depth(freq1=16,freq2=24,ph_mask=2,phase_in=0,phase_corr=0):
+        dual_freq=np.gcd(freq1,freq2)
+        ma=freq1/dual_freq
+        mb=freq2/dual_freq
+        l_speed=299792458 #m/s
+        max_range=l_speed/(2e6*dual_freq)
+        calc_depth=np.round(phase_in*(max_range*(2**(5-ph_mask)))/(ma*mb*(2**12)),decimals=4)
+        return calc_depth
+
+class Exp_pack(Out_texas_reader):
+    def __init__(self,all_exp_fld="D:/26022020/",amp_mask_value=20):
+        mfld=Main_folder_select(all_exp_fld)
+        mfld.swipe_folders()
+        self.paths=mfld.folder_path_list
+        self.all_exp_fld=all_exp_fld
+        self.amp_mask_value=amp_mask_value
+    
+    def pack_data(self):
+
+        for num, experiment in enumerate(self.paths):
+            _,exp_folder=experiment.split(self.all_exp_fld)
+            exp_depth=int(exp_folder)/1000
+            data=Out_texas_reader(experiment)
+            array,df=data.read()
+            amp_mask=array[:,4]>self.amp_mask_value
+            masked_array=array[amp_mask]
+            expected_exp_phase=data.depth2phase(exp_depth=exp_depth)
+            expected_exp_depth_array=np.ones((masked_array.shape[0],1))*exp_depth
+
+            expected_exp_phase_array=np.ones((masked_array.shape[0],1))*expected_exp_phase
+            calc_depth_array=data.phase2depth(phase_in=masked_array[:,6])
+            calc_depth_array=calc_depth_array.reshape(len(calc_depth_array),1)
+            pack_array=np.hstack((masked_array,
+                                  expected_exp_phase_array,
+                                  expected_exp_depth_array,
+                                  calc_depth_array))
+            if num==0:
+                main_array=pack_array
+            else:
+                main_array=np.vstack((main_array,pack_array))
+        old_columns=df.columns.to_list()
+        n_columns=['expected_phase', 'expected_depth', 'calculated_depth']
+        n_columns=old_columns+n_columns
+        new_df=pd.DataFrame(main_array,columns=n_columns)
+        new_df["label"]="None"
+        return main_array, new_df
+
+    def bounding_box_label(self,df,i_min,i_max,j_min,j_max,target_name,exp_depth):
+        mask_i=(df["i_pxl"]>=i_min & df["i_pxl"]<=i_max)
+        mask_j=(df["j_pxl"]>=j_min & df["j_pxl"]<=j_max)
+        mask_i_j=mask_i&mask_j
+        mask_d=df["expected_depth"]==exp_depth
+        mask_i_j_d=mask_i_j&mask_d
+        df.loc[mask_i_j_d,"label"]=target_name
+        return df
+
+    def df_with_label(self,boxbox_list,df):
+        for bbox in boxbox_list:
+            i_min,i_max,j_min,j_max,target_name,exp_depth=bbox
+            df=self.bounding_box_label(df,i_min,i_max,j_min,j_max,target_name,exp_depth)
+        return df
+
+    def depth_plot(self,df,y_label="phase",labels=["None"]):
+        x_label="expected_depth"
+        plot_list=[]
+        ax1 = plt.subplot(211)
+        ax2 = plt.subplot(212, sharex=ax1)
+        ls = 'dotted'
+        title_name1=("expected_depth"+" vs "+y_label+" Mean+-Std")
+        title_name2=("expected_depth"+"event count")
+        ax1.set_title(title_name1)
+        ax2.set_title(title_name2)
+
+        for label in labels:
+            mask=df["label"]==label
+            x_values=df[x_label].drop_duplicates().to_list()
+            for x_value in x_values:
+                mask=df[x_label]==x_value
+                series=df[mask][y_label]
+                ax1.errorbar(x_value,series.mean(),yerr=series.std(),marker='o',linestyle=ls,label=label)
+                ax2.plot(x_value,mask.sum(),marker='o',linestyle=ls,label=label)
+                #plot_list.append([x_value,series.mean(),series.std(),mask.sum(),label])
+        plt.show()
+        #plot_array=np.array(plot_list)
+                    
+
 
 class Frame_data():
     def __init__(self,all_data,step=30,axis_name=" ",lower_thresh=20):
@@ -457,15 +597,28 @@ class Triple_Param_Analysis():
         plt.show()       
 
 def main():
-    exp_dir="d:/tof/inputs/"
-    a=gui(exp_dir)
-    from IPython import embed; embed()
-    # all_exp_folder="D:/Codes/Videos_tof/Experimento_alcance/"
+    #exp_dir="D:/26022020/"
+    #a.loop()
+    all_exp_folder="D:/26022020/"
+    a=Exp_pack(all_exp_fld=all_exp_folder)
+    array,df=a.pack_data()
+    a.depth_plot(df)
+    df["phase error"]=abs(df["expected_phase"]-df["phase"])
+    df["depth error"]=abs(df["calculated_depth"]-df["expected_depth"])
+    mask1=df["phase error"]<=50
+    df2=df[mask1]
+    a.depth_plot(df2)
+    a.depth_plot(df2,y_label="amplitude")
+    a.depth_plot(df2,y_label="phase error")
+    a.depth_plot(df2,y_label="depth error")
     # mfld=Main_folder_select(all_exp_folder)
     # mfld.swipe_folders()
     # mfld.all_exp_folder
-    # a=mfld.folder_path_list[31]
-    # binf=Bin_file_reader(a)
+    # a=mfld.folder_path_list[0]
+    # b=Out_texas_reader(a)
+    # arraypack,df=b.read()
+    
+    # binf=Bin_texas_reader(a)
     # binf.path_list
     # binf.device_resol
     # binf.path_list[0]
@@ -473,9 +626,17 @@ def main():
     # data,filetype,fmap=bin_arr.reshape_single(binf.path_list[0])
     # dataG=bin_arr.reshape_multi(binf.path_list)
 
+    #ambient_resume=arraypack[:,3]
+    
+    # amp_mask=arraypack[:,4]>20
+    # masked_pack=arraypack[amp_mask]
+    from IPython import embed; embed()
+
+    #flags_resume=arraypack[:,5]
+    #phase_resume=arraypack[:,6]
     # #################################################################################################
     # A_data=dataG[:,0,:,:]
-
+    # A_data=masked_pack[:,4]
 
     # ganim=Graph_Anim(A_data,step=100,axis_name=" ",lower_thresh=100)
     # ganim.start_graph()
