@@ -389,16 +389,14 @@ class Exp_pack(Out_texas_reader):
         plt.show()
         #plot_array=np.array(plot_list)
                     
-   
-
 def main():
     ### Example Code
     ###### Amp Mask Value removes data which are below the threshold value
     all_exp_folder="D:/26022020/"
     a=Exp_pack(all_exp_fld=all_exp_folder,amp_mask_value=20)
     ###### Evaluate multiple folders at once and define region for analysis (crop_count = number of regions to crop)
-    array, df, bboxes=a.pack_data(crop_mode=True,crop_count=1)
-
+    array, df, bboxes=a.pack_data(crop_mode=False,crop_count=1)
+    from IPython import embed; embed()
     ###### create df with labels based on the selected regions
     dflabel=a.create_label_df(bboxes,save=True,file_output="D:/26022020/crop_coord_labelV0.xlsx")
     #### if dflabel exists it can be loaded
