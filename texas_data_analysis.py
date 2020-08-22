@@ -12,7 +12,7 @@ from matplotlib import animation
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 #from samples.texas.read_recorded.main import gui
-from read_write.utils import reader
+from read_write.utils import reader, check_dir
 from label_crop import Crops
 
 
@@ -392,22 +392,24 @@ class Exp_pack(Out_texas_reader):
 def main():
     ### Example Code
     ###### Amp Mask Value removes data which are below the threshold value
-    all_exp_folder="D:/26022020/"
+    all_exp_folder="D:/26022020/" #arquivo com os experimentos
+    output_folder="D:/26022020/DATA_OUTPUT/" # arquivo com para saída de experimentos
+    check_dir(output_folder)
     a=Exp_pack(all_exp_fld=all_exp_folder,amp_mask_value=20)
     ###### Evaluate multiple folders at once and define region for analysis (crop_count = number of regions to crop)
-    array, df, bboxes=a.pack_data(crop_mode=False,crop_count=1)
+    array, df, bboxes=a.pack_data(crop_mode=True,crop_count=1)
     from IPython import embed; embed()
     ###### create df with labels based on the selected regions
-    dflabel=a.create_label_df(bboxes,save=True,file_output="D:/26022020/crop_coord_labelV0.xlsx")
+    dflabel=a.create_label_df(bboxes,save=True,file_output=output_folder+"crop_coord_labelV0.xlsx")
     #### if dflabel exists it can be loaded
-    dflabel=a.load_label_df(file_input="D:/26022020/crop_coord_labelV0.xlsx")
+    #dflabel=a.load_label_df(file_input="D:/26022020/crop_coord_labelV0.xlsx")
     #### to apply the labels over the original dataset
     df=a.apply_label_df(dflabel,df)
 
     #### save the main df as a checkpoint, to avoid new image annotations 
-    a.save_main_data_pack(df,file_output="D:/26022020/example_exp_resume.csv")
+    a.save_main_data_pack(df,file_output=output_folder+"example_exp_resume.csv")
     #### load a main df checkpoint 
-    df=a.load_main_data_pack(file_input="D:/26022020/filtered_exp_resume.csv")
+    df=a.load_main_data_pack(file_input=output_folder+"filtered_exp_resume.csv")
     #### add calculated values
     df["phase error"]=abs(df["expected_phase"]-df["phase"])
     df["depth error"]=abs(df["calculated_depth"]-df["expected_depth"])
